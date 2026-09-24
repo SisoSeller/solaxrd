@@ -516,6 +516,10 @@
         title: "Cookie",
         html: "<p>Questo sito non usa cookie di pubblicità o di statistica.</p><p>Se premi Accetta o Rifiuta, la scelta resta solo sul tuo dispositivo, per non mostrarti di nuovo questo avviso.</p>",
       },
+      terms: {
+        title: "Termini di utilizzo",
+        html: "<p>Puoi scaricare SolaxRD per usarlo sul tuo dispositivo. Non rivendere il file e non spacciarlo per un altro programma.</p><p>Il nome e la password restano tuoi. SolaxRD non è Discord.</p>",
+      },
       notice: {
         title: "Note legali",
         html: "<p>© 2026 SolaxRD. I testi, il segno e i file di download di questa pagina appartengono a chi pubblica SolaxRD.</p><p>SolaxRD non è Discord e non è collegato a Discord.</p>",
@@ -529,8 +533,8 @@
       box.hidden = false;
     };
     $("#open-privacy")?.addEventListener("click", () => open("privacy"));
+    $("#open-terms")?.addEventListener("click", () => open("terms"));
     $("#open-cookies")?.addEventListener("click", () => open("cookies"));
-    $("#open-notice")?.addEventListener("click", () => open("notice"));
     $("#legal-close")?.addEventListener("click", () => { if (box) box.hidden = true; });
     box?.addEventListener("click", (event) => { if (event.target === box) box.hidden = true; });
     const choice = localStorage.getItem("solaxrd-cookie");

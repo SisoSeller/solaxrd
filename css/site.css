@@ -661,20 +661,41 @@ html[data-tone="light"] .spot-grid {
 .get-title { font-size: clamp(48px, 11vw, 148px); margin: 8px 0 12px; padding: 0 12px; white-space: nowrap; }
 .get .lead { margin: 0 auto 28px; }
 
-.foot { position: relative; z-index: 1; border-top: 1px solid var(--line); }
-.legal {
-  width: min(880px, 100%);
-  margin: 0 auto;
-  padding: 36px 24px 48px;
-  color: var(--muted);
-  font-size: 14px;
+.foot { position: relative; z-index: 1; border-top: 1px solid var(--line); padding: 48px 24px 28px; }
+.foot-cols {
+  width: min(1080px, 100%);
+  margin: 0 auto 28px;
   display: grid;
-  gap: 12px;
+  grid-template-columns: 1.2fr 1fr 1fr auto;
+  gap: 28px;
 }
-.legal nav { display: flex; flex-wrap: wrap; gap: 8px; }
-.legal button {
-  height: 36px; padding: 0 14px; border-radius: 999px;
-  border: 1px solid var(--line); color: var(--text);
+.foot-cols h2 {
+  font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.foot-cols a, .foot-cols button {
+  display: block; color: var(--muted); text-align: left;
+  padding: 6px 0; font-size: 15px;
+}
+.foot-cols a:hover { color: var(--text); }
+.lang select {
+  height: 40px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+}
+.foot-bar {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; gap: 12px 22px;
+  align-items: center; justify-content: space-between;
+  color: var(--muted); font-size: 14px;
+}
+.foot-bar nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.foot-bar button { color: var(--muted); }
+.foot-bar button:hover, .foot-bar strong { color: var(--text); }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
 }
 .legal-box {
   position: fixed; inset: 0; z-index: 110;
@@ -747,7 +768,8 @@ html[data-tone="light"] .spot-grid {
 }
 @media (max-width: 640px) {
   .hero { padding-top: 120px; }
-  .grid, .stats, .steps { grid-template-columns: 1fr; }
+  .grid, .steps { grid-template-columns: 1fr; }
+  .foot-cols { grid-template-columns: 1fr 1fr; }
   .device-body { grid-template-columns: 1fr; }
   .mock-rail, .mock-people { display: none; }
   .hero-title { font-size: clamp(40px, 13vw, 56px); }
