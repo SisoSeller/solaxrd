@@ -52,7 +52,6 @@
       </a>
       <nav class="nav-links">
         <a href="#features">Spazio</a>
-        <a href="#reel">Film</a>
         <a href="#live">Voce</a>
         <a href="#themes">Colori</a>
         <a href="#get">Download</a>
@@ -67,7 +66,6 @@
   </header>
   <nav class="menu" id="menu" aria-hidden="true">
     <a href="#features">Spazio</a>
-    <a href="#reel">Film</a>
     <a href="#live">Voce</a>
     <a href="#themes">Colori</a>
     <a href="#get">Download</a>
@@ -149,14 +147,6 @@
           </div>
         </div>
       </div>
-      <a class="scroll-hint" href="#features">Scorri</a>
-    </section>
-
-    <section class="marquee" aria-hidden="true">
-      <div class="marquee-track">
-        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Foto</span><span>Schermo</span>
-        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Foto</span><span>Schermo</span>
-      </div>
     </section>
 
     <section class="features" id="features">
@@ -199,37 +189,6 @@
           <h3>Un setup</h3>
           <p>Un exe. Si installa in locale, si aggiorna da solo. Niente store, niente account mail.</p>
         </article>
-      </div>
-    </section>
-
-    <section class="reel" id="reel">
-      <div class="reel-sticky">
-        <div class="reel-track" id="reel-track">
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">01</span>
-            <small>01 — Voce</small>
-            <h2>Parla come se fossi lì.</h2>
-            <p>Microfono, camera, schermo. I nomi veri dei dispositivi Windows, il dock in basso, il gruppo nello stesso respiro.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">02</span>
-            <small>02 — Gruppi</small>
-            <h2>Cinque. Non di più.</h2>
-            <p>Una stanza piccola. Elenco a destra, volti visibili, chiamata insieme. Niente server da mille persone.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">03</span>
-            <small>03 — File</small>
-            <h2>Due giga. Un invio.</h2>
-            <p>Foto, GIF, cartelle, quello che vuoi. Si apre, si scarica, resta tra voi. Punto a punto.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">04</span>
-            <small>04 — Tuo</small>
-            <h2>La luce la scegli tu.</h2>
-            <p>Sei temi. La tua foto. Il tuo nome. Niente mail, niente store, niente attesa.</p>
-          </article>
-        </div>
       </div>
     </section>
 
@@ -287,25 +246,6 @@
       </ol>
     </section>
 
-    <section class="stats">
-      <div class="stat reveal">
-        <strong data-static>0</strong>
-        <span>secondi per entrare</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="5">0</strong>
-        <span>persone per gruppo</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="2" data-suffix=" GB">0</strong>
-        <span>limite file</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="6">0</strong>
-        <span>colori</span>
-      </div>
-    </section>
-
     <section class="themes" id="themes">
       <p class="kicker reveal"><span></span> Pelle</p>
       <h2 class="section-title reveal">Cambia luce.<br>Non cambia te.</h2>
@@ -343,21 +283,32 @@
   </main>
 
   <footer class="foot">
-    <div class="foot-marquee" aria-hidden="true">
-      <div>
-        <span>SolaxRD</span><span>Windows</span><span>Voce</span><span>Gruppi</span><span>2 GB</span>
-        <span>SolaxRD</span><span>Windows</span><span>Voce</span><span>Gruppi</span><span>2 GB</span>
-      </div>
-    </div>
-    <div class="foot-row">
-      <img src="media/icon.png" alt="">
-      <div>
-        <strong>SolaxRD</strong>
-        <span>Fatto per Windows. Resta sul tuo PC.</span>
-      </div>
-      <a href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">Download</a>
+    <div class="legal">
+      <p>© 2026 SolaxRD. Tutti i diritti riservati.</p>
+      <p>SolaxRD è un software indipendente. Il nome, il marchio e i file di questa pagina restano di chi li pubblica. Non è affiliato a Discord.</p>
+      <nav>
+        <button type="button" id="open-privacy">Privacy</button>
+        <button type="button" id="open-cookies">Cookie</button>
+        <button type="button" id="open-notice">Note legali</button>
+      </nav>
     </div>
   </footer>
+
+  <div class="legal-box" id="legal-box" hidden>
+    <div class="legal-card" role="dialog" aria-modal="true" aria-labelledby="legal-title">
+      <h2 id="legal-title">Note</h2>
+      <div id="legal-copy"></div>
+      <button class="btn" type="button" id="legal-close">Chiudi</button>
+    </div>
+  </div>
+
+  <div class="cookie" id="cookie" hidden>
+    <p>Questo sito salva solo la tua scelta sui cookie, sul dispositivo. Niente pubblicità e niente tracciamento.</p>
+    <div>
+      <button type="button" id="cookie-no">Rifiuta</button>
+      <button type="button" id="cookie-yes">Accetta</button>
+    </div>
+  </div>
 
   <noscript>
     <style>.reveal{opacity:1;transform:none}.loader{display:none}[data-split] .ch{transform:none}</style>

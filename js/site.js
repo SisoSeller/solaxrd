@@ -502,6 +502,47 @@
     });
   }
 
+  function cookies() {
+    const bar = $("#cookie");
+    const box = $("#legal-box");
+    const title = $("#legal-title");
+    const copy = $("#legal-copy");
+    const pages = {
+      privacy: {
+        title: "Privacy",
+        html: "<p>SolaxRD non chiede la mail. Su questo sito non crei un account e non invii messaggi.</p><p>Il download è un file. Non raccogliamo un elenco di chi lo scarica da questa pagina.</p>",
+      },
+      cookies: {
+        title: "Cookie",
+        html: "<p>Questo sito non usa cookie di pubblicità o di statistica.</p><p>Se premi Accetta o Rifiuta, la scelta resta solo sul tuo dispositivo, per non mostrarti di nuovo questo avviso.</p>",
+      },
+      notice: {
+        title: "Note legali",
+        html: "<p>© 2026 SolaxRD. I testi, il segno e i file di download di questa pagina appartengono a chi pubblica SolaxRD.</p><p>SolaxRD non è Discord e non è collegato a Discord.</p>",
+      },
+    };
+    const open = (key) => {
+      const page = pages[key];
+      if (!page || !box || !title || !copy) return;
+      title.textContent = page.title;
+      copy.innerHTML = page.html;
+      box.hidden = false;
+    };
+    $("#open-privacy")?.addEventListener("click", () => open("privacy"));
+    $("#open-cookies")?.addEventListener("click", () => open("cookies"));
+    $("#open-notice")?.addEventListener("click", () => open("notice"));
+    $("#legal-close")?.addEventListener("click", () => { if (box) box.hidden = true; });
+    box?.addEventListener("click", (event) => { if (event.target === box) box.hidden = true; });
+    const choice = localStorage.getItem("solaxrd-cookie");
+    if (bar && !choice) bar.hidden = false;
+    const save = (value) => {
+      localStorage.setItem("solaxrd-cookie", value);
+      if (bar) bar.hidden = true;
+    };
+    $("#cookie-yes")?.addEventListener("click", () => save("yes"));
+    $("#cookie-no")?.addEventListener("click", () => save("no"));
+  }
+
   function fileSize() {
     fetch("download/SolaxRD-Setup.exe", { method: "HEAD" }).then((res) => {
       const n = Number(res.headers.get("content-length"));
@@ -532,6 +573,7 @@
       talking();
       callControls();
       fileSize();
+      cookies();
       await loader();
       document.body.classList.add("ready");
       $(".hero-title")?.classList.add("play");

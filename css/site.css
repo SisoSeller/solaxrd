@@ -662,6 +662,50 @@ html[data-tone="light"] .spot-grid {
 .get .lead { margin: 0 auto 28px; }
 
 .foot { position: relative; z-index: 1; border-top: 1px solid var(--line); }
+.legal {
+  width: min(880px, 100%);
+  margin: 0 auto;
+  padding: 36px 24px 48px;
+  color: var(--muted);
+  font-size: 14px;
+  display: grid;
+  gap: 12px;
+}
+.legal nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.legal button {
+  height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--text);
+}
+.legal-box {
+  position: fixed; inset: 0; z-index: 110;
+  display: grid; place-items: center; padding: 22px;
+  background: rgba(0,0,0,.5);
+}
+.legal-box[hidden] { display: none; }
+.legal-card {
+  width: min(520px, 100%);
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 20px;
+  padding: 22px; display: grid; gap: 14px;
+}
+.legal-card p { color: var(--muted); }
+.cookie {
+  position: fixed; z-index: 100; left: 16px; right: 16px; bottom: 16px;
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;
+  padding: 16px 18px; border-radius: 18px;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 50px rgba(0,0,0,.35);
+}
+.cookie[hidden] { display: none; }
+.cookie p { color: var(--muted); font-size: 14px; max-width: 460px; }
+.cookie div { display: flex; gap: 8px; }
+.cookie button {
+  height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
+}
+#cookie-yes { background: var(--btn); color: var(--btn-text); border-color: transparent; }
 .foot-marquee { overflow: hidden; border-bottom: 1px solid var(--line); padding: 14px 0; }
 .foot-marquee div {
   display: flex; gap: 40px; width: max-content;
