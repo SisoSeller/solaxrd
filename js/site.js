@@ -514,6 +514,9 @@
     fetch("download/SolaxRD.apk", { method: "HEAD" }).then((res) => {
       apply("[data-size-apk]", Number(res.headers.get("content-length")));
     }).catch(() => {});
+    fetch("download/SolaxRD.ipa", { method: "HEAD" }).then((res) => {
+      apply("[data-size-ipa]", Number(res.headers.get("content-length")));
+    }).catch(() => {});
   }
 
   async function boot() {
