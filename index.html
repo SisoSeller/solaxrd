@@ -1,401 +1,135 @@
 <!DOCTYPE html>
-<html lang="it" data-tone="dark">
+<html lang="it">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#070707">
-  <meta name="description" content="SolaxRD è la chat per Windows, Android e iPhone: chiamate, gruppi, foto e file. Stesso nome, stessa password.">
-  <meta property="og:title" content="SolaxRD — Il tuo spazio. Subito.">
-  <meta property="og:description" content="Chat, voce e gruppi su PC, Android e iPhone. Scarica SolaxRD.">
+  <meta name="theme-color" content="#090014">
+  <meta name="description" content="SolaxRD per Windows, Android e iPhone. Stesso nome, stessa password. Scarica qui.">
+  <meta property="og:title" content="SolaxRD">
+  <meta property="og:description" content="Chat, voce e gruppi. Scarica per PC, Android o iPhone.">
   <meta property="og:image" content="media/icon.png">
-  <meta property="og:type" content="website">
-  <title>SolaxRD — Il tuo spazio. Subito.</title>
+  <title>SolaxRD</title>
   <link rel="icon" href="media/favicon.png">
   <link rel="apple-touch-icon" href="media/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/site.css">
-  <link rel="stylesheet" href="css/edition.css">
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Unbounded:wght@700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/burst.css">
 </head>
 <body>
-  <a class="skip" href="#top">Vai al contenuto</a>
-
-  <div class="loader" id="loader" aria-hidden="true">
-    <div class="loader-core">
-      <div class="loader-ring"></div>
-      <div class="loader-mark">
-        <img src="media/icon.png" alt="">
-      </div>
-    </div>
-    <div class="loader-bar"><span id="loader-fill"></span></div>
-    <p class="loader-count" id="loader-count">00</p>
-    <p class="loader-word">SolaxRD</p>
+  <div class="boot" id="boot">
+    <p id="boot-word">SOLAXRD</p>
+    <div class="boot-bar"><span id="boot-fill"></span></div>
   </div>
 
+  <canvas id="dust" aria-hidden="true"></canvas>
+  <div class="wash" aria-hidden="true"></div>
+  <div class="floaters" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
   <div class="cursor" id="cursor"></div>
-  <div class="cursor-ring" id="cursor-ring"></div>
-  <canvas id="field" aria-hidden="true"></canvas>
-  <div class="vignette" aria-hidden="true"></div>
-  <div class="noise" aria-hidden="true"></div>
-  <div class="orbs" id="orbs" aria-hidden="true">
-    <span class="orb orb-a"></span>
-    <span class="orb orb-b"></span>
-    <span class="orb orb-c"></span>
-  </div>
-  <div class="progress" id="progress"></div>
 
-  <header class="nav" id="nav">
-    <div class="nav-inner">
-      <a class="brand" href="#top">
-        <img src="media/icon.png" alt="">
-        <span>SolaxRD</span>
-      </a>
-      <nav class="nav-links">
-        <a href="#features">Spazio</a>
-        <a href="#reel">Film</a>
-        <a href="#live">Voce</a>
-        <a href="#themes">Colori</a>
-        <a href="#get">Download</a>
-      </nav>
-    <a class="nav-cta" href="#get">
-      <span class="magnetic-inner">Scarica</span>
-    </a>
-      <button class="nav-toggle" id="nav-toggle" type="button" aria-label="Apri il menu" aria-controls="menu" aria-expanded="false">
-        <span></span><span></span>
-      </button>
-    </div>
+  <header class="top">
+    <a class="logo" href="#top"><img src="media/icon.png" alt=""> SolaxRD</a>
+    <a class="top-go" href="#get">Scarica</a>
+    <button class="burger" id="burger" type="button" aria-label="Apri il menu" aria-expanded="false"><span></span><span></span></button>
   </header>
-  <nav class="menu" id="menu" aria-hidden="true">
-    <a href="#features">Spazio</a>
-    <a href="#reel">Film</a>
-    <a href="#live">Voce</a>
-    <a href="#themes">Colori</a>
+  <nav class="sheet" id="sheet" hidden>
+    <a href="#cosa">Cosa fa</a>
     <a href="#get">Download</a>
-    <a class="menu-dl" href="#get">Scarica PC, Android o iPhone</a>
+    <a href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">PC</a>
+    <a href="download/SolaxRD.apk" download="SolaxRD.apk">Android</a>
+    <a href="download/SolaxRD.ipa" download="SolaxRD.ipa">iPhone</a>
   </nav>
 
   <main id="top">
     <section class="hero">
-      <div class="spot-grid" id="spot-grid" aria-hidden="true"></div>
-      <p class="kicker reveal"><span></span> Windows · Android · iPhone</p>
-      <h1 class="hero-title" data-split>SolaxRD</h1>
-      <p class="lead reveal">Chat e chiamate sul computer, su Android e su iPhone. Stesso nome, stessa password.</p>
-      <div class="hero-actions reveal">
-        <div class="dl-row">
-          <a class="btn btn-glow" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
-            <span class="magnetic-inner">
-              <span class="btn-shine"></span>
-              Scarica per PC
-            </span>
-          </a>
-          <a class="btn btn-ghost" href="download/SolaxRD.apk" download="SolaxRD.apk">
-            <span class="magnetic-inner">Android</span>
-          </a>
-          <a class="btn btn-ghost" href="download/SolaxRD.ipa" download="SolaxRD.ipa">
-            <span class="magnetic-inner">iPhone</span>
-          </a>
-        </div>
-        <p class="btn-meta" id="hero-meta">Windows · Android · iPhone · nome e password</p>
+      <p class="eyebrow"><span></span> chat · voce · gruppi</p>
+      <h1 class="mega" id="mega" aria-label="SolaxRD">
+        <span>S</span><span>o</span><span>l</span><span>a</span><span>x</span><span>R</span><span>D</span>
+      </h1>
+      <p class="deck">Il tuo spazio, sul computer e in tasca. Un nome. Una password. Basta.</p>
+      <div class="hero-dl">
+        <a class="pill hot" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">PC</a>
+        <a class="pill" href="download/SolaxRD.apk" download="SolaxRD.apk">Android</a>
+        <a class="pill" href="download/SolaxRD.ipa" download="SolaxRD.ipa">iPhone</a>
       </div>
-      <div class="hero-stage">
-        <div class="hero-s" aria-hidden="true">S</div>
-        <div class="device" id="device">
-          <div class="device-bar">
-            <span></span><span></span><span></span>
-            <strong>SolaxRD</strong>
-          </div>
-          <div class="device-body">
-            <aside class="mock-rail">
-              <div class="mock-s">S</div>
-              <i class="dot-btn"></i>
-              <i class="dot-btn"></i>
-            </aside>
-            <div class="mock-list">
-              <small>Chat</small>
-              <button type="button" class="mock-row" data-chat="mare">
-                <span class="ava a1">M</span>
-                <span><b>Mare</b><em>In chiamata</em></span>
-              </button>
-              <button type="button" class="mock-row" data-chat="vento">
-                <span class="ava a2">V</span>
-                <span><b>Vento</b><em>Online</em></span>
-              </button>
-              <button type="button" class="mock-row active" data-chat="notte">
-                <span class="ava a3">#</span>
-                <span><b>Notte</b><em>3 in ascolto</em></span>
-              </button>
-            </div>
-            <div class="mock-thread">
-              <header>
-                <span class="ava a3" id="thread-ava">#</span>
-                <div>
-                  <b id="thread-name">Notte</b>
-                  <em id="thread-meta">Gruppo · 3</em>
-                </div>
-              </header>
-              <div class="bubbles" id="bubbles"></div>
-              <footer class="mock-compose"><span>Scrivi un messaggio</span></footer>
-            </div>
-            <div class="mock-people">
-              <small>Persone 2/5</small>
-              <div class="person">
-                <span class="ava a4">K</span>
-                <span><b>Kappa <i>(tu)</i></b><em>Online</em></span>
-              </div>
-              <div class="person dim">
-                <span class="ava a5">S</span>
-                <span><b>Sable</b><em>Offline</em></span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="phone" aria-hidden="true">
-          <div class="phone-bar"></div>
-          <div class="phone-screen">
-            <small>In chiamata</small>
-            <strong>Notte</strong>
-            <em>3 in ascolto</em>
-            <span></span><span></span><span></span>
-          </div>
-        </div>
-      </div>
-      <a class="scroll-hint" href="#features">Scorri</a>
-    </section>
-
-    <section class="marquee" aria-hidden="true">
-      <div class="marquee-track">
-        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Android</span><span>Foto</span><span>Schermo</span>
-        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Android</span><span>Foto</span><span>Schermo</span>
+      <div class="orbit" aria-hidden="true">
+        <b></b>
+        <b></b>
+        <b></b>
       </div>
     </section>
 
-    <section class="features" id="features">
-      <p class="kicker reveal"><span></span> Lo spazio</p>
-      <h2 class="section-title reveal">Tutto quello che serve.<br>Niente di più.</h2>
-      <div class="grid">
-        <article class="card tilt" data-spot>
-          <div class="card-index">01</div>
-          <div class="card-ico pulse">◎</div>
-          <h3>Chiamate vere</h3>
-          <p>Microfono, camera e condivisione schermo. I dispositivi hanno i nomi veri, non “Dispositivo 1”.</p>
+    <div class="tape" aria-hidden="true">
+      <div>
+        <span>VOCE</span><span>VIDEO</span><span>GRUPPI</span><span>2 GB</span><span>FOTO</span><span>TEMI</span>
+        <span>VOCE</span><span>VIDEO</span><span>GRUPPI</span><span>2 GB</span><span>FOTO</span><span>TEMI</span>
+      </div>
+    </div>
+    <div class="tape tape-back" aria-hidden="true">
+      <div>
+        <span>WINDOWS</span><span>ANDROID</span><span>IPHONE</span><span>SOLAXRD</span>
+        <span>WINDOWS</span><span>ANDROID</span><span>IPHONE</span><span>SOLAXRD</span>
+      </div>
+    </div>
+
+    <section class="cosa" id="cosa">
+      <h2>Si muove.<br>Come te.</h2>
+      <div class="bento">
+        <article class="tile t1">
+          <h3>Chiamate</h3>
+          <p>Microfono e camera, con i nomi veri dei dispositivi.</p>
         </article>
-        <article class="card tilt" data-spot>
-          <div class="card-index">02</div>
-          <div class="card-ico">⌗</div>
-          <h3>Gruppi stretti</h3>
-          <p>Massimo cinque persone. Elenco a destra, chiamata insieme, come una stanza piccola.</p>
+        <article class="tile t2">
+          <h3>Gruppi da 5</h3>
+          <p>Una stanza piccola. Tutti nello stesso respiro.</p>
         </article>
-        <article class="card tilt" data-spot>
-          <div class="card-index">03</div>
-          <div class="card-ico">▭</div>
-          <h3>File enormi</h3>
-          <p>Foto, GIF e file fino a 2 GB. Si aprono, si scaricano, restano tra voi.</p>
+        <article class="tile t3">
+          <h3>File da 2 GB</h3>
+          <p>Foto, GIF, quello che vuoi, tra di voi.</p>
         </article>
-        <article class="card tilt" data-spot>
-          <div class="card-index">04</div>
-          <div class="card-ico">◐</div>
-          <h3>Colori tuoi</h3>
-          <p>Nero, bianco, viola, blu, verde, rosa. L’interfaccia segue te, non una moda.</p>
+        <article class="tile t4">
+          <h3>Tre schermi</h3>
+          <p>PC, Android, iPhone. Stesso account.</p>
         </article>
-        <article class="card tilt" data-spot>
-          <div class="card-index">05</div>
-          <div class="card-ico">⊙</div>
-          <h3>Foto profilo</h3>
-          <p>La tua foto si vede in chat e nel gruppo. Anche se l’altro è offline.</p>
-        </article>
-        <article class="card tilt" data-spot>
-          <div class="card-index">06</div>
-          <div class="card-ico">⊞</div>
-          <h3>Tre posti. Un account.</h3>
-          <p>Windows, Android e iPhone. Stesso nome, stessa password.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="reel" id="reel">
-      <div class="reel-sticky">
-        <div class="reel-track" id="reel-track">
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">01</span>
-            <small>01 — Voce</small>
-            <h2>Parla come se fossi lì.</h2>
-            <p>Microfono, camera, schermo. I nomi veri dei dispositivi Windows, il dock in basso, il gruppo nello stesso respiro.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">02</span>
-            <small>02 — Gruppi</small>
-            <h2>Cinque. Non di più.</h2>
-            <p>Una stanza piccola. Elenco a destra, volti visibili, chiamata insieme. Niente server da mille persone.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">03</span>
-            <small>03 — File</small>
-            <h2>Due giga. Un invio.</h2>
-            <p>Foto, GIF, cartelle, quello che vuoi. Si apre, si scarica, resta tra voi. Punto a punto.</p>
-          </article>
-          <article class="reel-panel">
-            <span class="reel-bg" aria-hidden="true">04</span>
-            <small>04 — Tuo</small>
-            <h2>La luce la scegli tu.</h2>
-            <p>Sei temi. La tua foto. Il tuo nome. Niente mail, niente store, niente attesa.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="live" id="live">
-      <div class="live-copy">
-        <p class="kicker reveal"><span></span> Voce</p>
-        <h2 class="section-title reveal">Entra. Parla.<br>Resta.</h2>
-        <p class="reveal">Premi per parlare, togli l’eco, scegli microfono e cuffie. La chiamata di gruppo tiene tutti nello stesso respiro, con i volti a destra.</p>
-        <ul class="ticks reveal">
-          <li>Audio in uscita e microfono con i nomi Windows</li>
-          <li>Mutato e silenziato dal dock, come in una console</li>
-          <li>Stati: online, assente, non disturbare</li>
-        </ul>
-      </div>
-      <div class="live-stage reveal">
-        <canvas id="eq" class="eq" aria-hidden="true"></canvas>
-        <div class="call-card">
-          <div class="call-top">
-            <span class="live-dot"></span>
-            In chiamata · Notte
-          </div>
-          <div class="call-faces">
-            <div class="face" data-face><span>K</span><small>tu</small></div>
-            <div class="face talking" data-face><span>M</span><small>Mare</small></div>
-            <div class="face" data-face><span>V</span><small>Vento</small></div>
-          </div>
-          <div class="call-bar">
-            <button type="button" data-toggle="mic" aria-pressed="false">Microfono</button>
-            <button type="button" data-toggle="audio" aria-pressed="false">Audio</button>
-            <button type="button" class="danger" data-toggle="end">Chiudi</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="path" id="path">
-      <p class="kicker reveal"><span></span> Tre gesti</p>
-      <h2 class="section-title reveal">Scarica. Entra.<br>Parla.</h2>
-      <ol class="steps">
-        <li class="step reveal">
-          <b>01</b>
-          <h3>Prendi PC o telefono</h3>
-          <p>Windows: setup .exe. Android: APK. Stesso account, niente mail.</p>
-        </li>
-        <li class="step reveal">
-          <b>02</b>
-          <h3>Apri con il tuo nome</h3>
-          <p>Nome e password. Niente mail. L’account è lo stesso su PC e telefono.</p>
-        </li>
-        <li class="step reveal">
-          <b>03</b>
-          <h3>Chiama chi vuoi</h3>
-          <p>Chat, gruppi, voce, file. Aggiornamenti dall’app, quando escono.</p>
-        </li>
-      </ol>
-    </section>
-
-    <section class="stats">
-      <div class="stat reveal">
-        <strong data-static>0</strong>
-        <span>secondi per entrare</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="5">0</strong>
-        <span>persone per gruppo</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="2" data-suffix=" GB">0</strong>
-        <span>limite file</span>
-      </div>
-      <div class="stat reveal">
-        <strong data-count="6">0</strong>
-        <span>colori</span>
-      </div>
-    </section>
-
-    <section class="themes" id="themes">
-      <p class="kicker reveal"><span></span> Pelle</p>
-      <h2 class="section-title reveal">Cambia luce.<br>Non cambia te.</h2>
-      <div class="swatches">
-        <button type="button" class="swatch on" data-tone="dark" style="--sw:#111; --fg:#f2f2f2">Nero</button>
-        <button type="button" class="swatch" data-tone="light" style="--sw:#f3f3f4; --fg:#161618">Bianco</button>
-        <button type="button" class="swatch" data-tone="purple" style="--sw:#2a1b3d; --fg:#c59bff">Viola</button>
-        <button type="button" class="swatch" data-tone="blue" style="--sw:#142433; --fg:#4aa3ff">Blu</button>
-        <button type="button" class="swatch" data-tone="green" style="--sw:#14241c; --fg:#3dcf7a">Verde</button>
-        <button type="button" class="swatch" data-tone="rose" style="--sw:#2a1520; --fg:#ff8fb1">Rosa</button>
       </div>
     </section>
 
     <section class="get" id="get">
-      <div class="get-glow" aria-hidden="true"></div>
-      <p class="kicker reveal"><span></span> Download</p>
-      <h2 class="get-title" data-split>Prendilo.</h2>
-      <p class="lead reveal">Tre download. Stesso SolaxRD. Entra con nome e password, dal PC, da Android o da iPhone.</p>
-      <div class="dl-cards">
-        <article class="dl-card reveal">
-          <small>PC</small>
-          <h3>Windows</h3>
-          <p>Windows 10 o 11. Un setup, si installa in locale, si aggiorna da solo.</p>
-          <a class="btn" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
-            <span class="magnetic-inner">
-              <span class="btn-shine"></span>
-              Scarica SolaxRD-Setup.exe
-            </span>
-          </a>
-          <span class="btn-meta"><span data-size>~16 MB</span> · .exe</span>
-        </article>
-        <article class="dl-card reveal" id="dl-android">
-          <small>Telefono</small>
-          <h3>Android</h3>
-          <p>APK da installare a mano. Consenti origini sconosciute, poi apri il file.</p>
-          <a class="btn" href="download/SolaxRD.apk" download="SolaxRD.apk">
-            <span class="magnetic-inner">
-              <span class="btn-shine"></span>
-              Scarica SolaxRD.apk
-            </span>
-          </a>
-          <span class="btn-meta"><span data-size-apk>~8 MB</span> · Android 8+ · .apk</span>
-        </article>
-        <article class="dl-card reveal" id="dl-ios">
-          <small>iPhone</small>
-          <h3>iOS</h3>
-          <p>Stesse chat, chiamate e gruppi. Scarica l’IPA e installalo con Sideloadly o AltStore, usando il tuo Apple ID.</p>
-          <a class="btn" href="download/SolaxRD.ipa" download="SolaxRD.ipa">
-            <span class="magnetic-inner">
-              <span class="btn-shine"></span>
-              Scarica SolaxRD.ipa
-            </span>
-          </a>
-          <span class="btn-meta"><span data-size-ipa>~2 MB</span> · iPhone · .ipa</span>
-        </article>
+      <p class="eyebrow"><span></span> download</p>
+      <h2>Prendilo ora.</h2>
+      <div class="ports">
+        <a class="port" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
+          <small>01</small>
+          <strong>Windows</strong>
+          <em>SolaxRD-Setup.exe</em>
+          <span data-size>PC</span>
+        </a>
+        <a class="port" href="download/SolaxRD.apk" download="SolaxRD.apk">
+          <small>02</small>
+          <strong>Android</strong>
+          <em>SolaxRD.apk</em>
+          <span data-size-apk>Telefono</span>
+        </a>
+        <a class="port" href="download/SolaxRD.ipa" download="SolaxRD.ipa">
+          <small>03</small>
+          <strong>iPhone</strong>
+          <em>SolaxRD.ipa</em>
+          <span data-size-ipa>Sideloadly o AltStore</span>
+        </a>
       </div>
     </section>
   </main>
 
-  <footer class="foot">
-    <div class="foot-marquee" aria-hidden="true">
-      <div>
-        <span>SolaxRD</span><span>Windows</span><span>Android</span><span>iPhone</span><span>Voce</span><span>Gruppi</span>
-        <span>SolaxRD</span><span>Windows</span><span>Android</span><span>iPhone</span><span>Voce</span><span>Gruppi</span>
-      </div>
+  <footer>
+    <img src="media/icon.png" alt="">
+    <div>
+      <strong>SolaxRD</strong>
+      <span>Windows, Android, iPhone.</span>
     </div>
-    <div class="foot-row">
-      <img src="media/icon.png" alt="">
-      <div>
-        <strong>SolaxRD</strong>
-      <span>Fatto per Windows, Android e iPhone. Resta sul tuo dispositivo.</span>
-      </div>
-      <a href="#get">Download</a>
-    </div>
+    <a href="#get">Download</a>
   </footer>
-
-  <noscript>
-    <style>.reveal{opacity:1;transform:none}.loader{display:none}[data-split] .ch{transform:none}</style>
-  </noscript>
-  <script src="js/site.js"></script>
+  <script src="js/burst.js"></script>
 </body>
 </html>
