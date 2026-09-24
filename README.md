@@ -1,23 +1,25 @@
 # SolaxRD — sito
 
-Sito di presentazione e download di SolaxRD.
+Landing e download di SolaxRD.
 
-## Apri in locale
+## Online
 
-Dalla cartella `site`:
+https://sisoseller.github.io/solaxrd/
+
+## Locale
 
 ```powershell
 python -m http.server 4173
 ```
 
-Poi vai su `http://127.0.0.1:4173`.
+Poi apri `http://127.0.0.1:4173`.
 
 ## Aggiorna il setup
 
-Quando esce una nuova `SolaxRD-Setup.exe`, copiala così:
+Quando esce una nuova `SolaxRD-Setup.exe`:
 
 ```powershell
 powershell -File .\sync-download.ps1
 ```
 
-Il file da scaricare sta in `download/SolaxRD-Setup.exe`.
+Poi commit e push. Il file sta in `download/SolaxRD-Setup.exe`.
