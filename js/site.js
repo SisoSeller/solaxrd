@@ -503,11 +503,16 @@
   }
 
   function fileSize() {
-    fetch("download/SolaxRD-Setup.exe", { method: "HEAD" }).then((res) => {
-      const n = Number(res.headers.get("content-length"));
+    const apply = (sel, n) => {
       if (!n) return;
       const mb = `${(n / (1024 * 1024)).toFixed(1)} MB`;
-      $$("[data-size]").forEach((el) => { el.textContent = mb; });
+      $$(sel).forEach((el) => { el.textContent = mb; });
+    };
+    fetch("download/SolaxRD-Setup.exe", { method: "HEAD" }).then((res) => {
+      apply("[data-size]", Number(res.headers.get("content-length")));
+    }).catch(() => {});
+    fetch("download/SolaxRD.apk", { method: "HEAD" }).then((res) => {
+      apply("[data-size-apk]", Number(res.headers.get("content-length")));
     }).catch(() => {});
   }
 
