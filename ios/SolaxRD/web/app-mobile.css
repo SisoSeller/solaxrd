@@ -1,0 +1,76 @@
+html.android, body.android { height: 100%; }
+body.android .traffic { display: none !important; }
+body.android .titlebar-drag { justify-content: flex-start; padding-left: 4px; }
+body.android .welcome { display: none !important; }
+body.android .who-pic { width: 40px; height: 40px; overflow: visible; border-radius: 50%; }
+body.android .chat-row.group .who-pic { border-radius: 12px; }
+body.android .row-avatar, body.android .row-letter {
+  width: 40px; height: 40px; max-width: 40px; max-height: 40px; object-fit: cover;
+}
+body.android .chat-row.group .row-letter { border-radius: 12px; }
+
+@media (max-width: 860px) {
+  body.android .shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  body.android .shell.has-people {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  body.android .rail { padding: 10px 6px; gap: 8px; }
+  body.android .rail-btn, body.android .me { width: 44px; height: 44px; }
+  body.android .mark.big { width: 36px; height: 36px; }
+  body.android .list { padding: 12px; }
+  body.android .stage { background: var(--bg); }
+  body.android .who-pic, body.android .row-avatar, body.android .row-letter {
+    width: 40px; height: 40px;
+  }
+  body.android .chat-row.group .row-letter { border-radius: 12px; }
+  body.android .chat-row:not(.group) .row-letter { border-radius: 50%; }
+  body.android .people {
+    position: absolute; right: 0; top: 0; bottom: 56px; width: min(280px, 86vw);
+    z-index: 30; background: var(--card); box-shadow: -12px 0 40px rgba(0,0,0,.35);
+  }
+  body.android .settings {
+    grid-template-columns: 1fr;
+    position: absolute; inset: 0; z-index: 50;
+  }
+  body.android .set-nav { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  body.android .set-body { padding: 18px 16px 32px; }
+  body.android .panel { padding: 18px; border-radius: 18px; }
+  body.android .composer { padding: 10px; }
+  body.android .thread-head { padding: 10px 12px; gap: 8px; }
+  body.android #mobile-back { height: 36px; padding: 0 10px; }
+  body.android .bubble { max-width: 86%; }
+  body.android .dock { padding: 8px 10px; }
+  body.android input, body.android select { min-width: 0; }
+}
+
+body.android.chat-open .list { display: none; }
+body.android.chat-open .shell { grid-template-columns: 64px minmax(0, 1fr); }
+body.android:not(.chat-open):not(.settings-open) .stage { display: none; }
+body.android.settings-open .list,
+body.android.settings-open .stage,
+body.android.settings-open .people { visibility: hidden; }
+
+@media (max-width: 640px) {
+  body.android .shell,
+  body.android.chat-open .shell,
+  body.android .shell.has-people {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) 58px auto;
+  }
+  body.android .rail {
+    grid-row: 2;
+    grid-column: 1;
+    flex-direction: row;
+    justify-content: space-around;
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    padding: 6px 8px;
+  }
+  body.android .list, body.android .stage { grid-row: 1; grid-column: 1; }
+  body.android .dock { grid-row: 3; }
+  body.android .rail-spacer { display: none; }
+  body.android .people { bottom: 116px; }
+}
