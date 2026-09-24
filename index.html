@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070707">
+  <meta name="description" content="SolaxRD è la chat per Windows: chiamate, gruppi, foto e file fino a 2 GB. Leggera, tua, senza browser.">
+  <meta property="og:title" content="SolaxRD">
+  <meta property="og:description" content="Chat, voce e gruppi sul desktop. Scarica per Windows.">
+  <meta property="og:image" content="media/icon.png">
+  <title>SolaxRD — Il tuo spazio. Subito.</title>
+  <link rel="icon" href="media/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader-mark">
+      <img src="media/icon.png" alt="">
+    </div>
+    <div class="loader-bar"><span id="loader-fill"></span></div>
+    <p class="loader-count" id="loader-count">00</p>
+  </div>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursor-ring"></div>
+  <canvas id="field" aria-hidden="true"></canvas>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="orbs" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <header class="nav">
+    <a class="brand" href="#top">
+      <img src="media/icon.png" alt="">
+      <span>SolaxRD</span>
+    </a>
+    <nav>
+      <a href="#features">Spazio</a>
+      <a href="#live">Voce</a>
+      <a href="#themes">Colori</a>
+      <a href="#get">Download</a>
+    </nav>
+    <a class="nav-cta magnetic" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">Scarica</a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="kicker reveal"><span></span> Windows · voce · gruppi</p>
+      <h1 class="hero-title" data-split>SolaxRD</h1>
+      <p class="lead reveal">Chat e chiamate sul desktop. Niente schede, niente attesa: apri, entra, parla.</p>
+      <div class="hero-actions reveal">
+        <a class="btn btn-glow magnetic" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
+          <span class="btn-shine"></span>
+          Scarica per Windows
+        </a>
+        <p class="btn-meta">Setup unico · ~16 MB · nome e password</p>
+      </div>
+      <div class="hero-stage">
+        <div class="hero-s" aria-hidden="true">S</div>
+        <div class="device" id="device">
+          <div class="device-bar">
+            <span></span><span></span><span></span>
+            <strong>SolaxRD</strong>
+          </div>
+          <div class="device-body">
+            <aside class="mock-rail">
+              <div class="mock-s">S</div>
+              <i class="dot-btn"></i>
+              <i class="dot-btn"></i>
+            </aside>
+            <div class="mock-list">
+              <small>Chat</small>
+              <button type="button" class="mock-row on">
+                <span class="ava a1">M</span>
+                <span><b>Mare</b><em>In chiamata</em></span>
+              </button>
+              <button type="button" class="mock-row">
+                <span class="ava a2">V</span>
+                <span><b>Vento</b><em>Online</em></span>
+              </button>
+              <button type="button" class="mock-row active">
+                <span class="ava a3">#</span>
+                <span><b>Notte</b><em>3 in ascolto</em></span>
+              </button>
+            </div>
+            <div class="mock-thread">
+              <header>
+                <span class="ava a3">#</span>
+                <div><b>Notte</b><em>Gruppo · 3</em></div>
+              </header>
+              <div class="bubbles" id="bubbles"></div>
+              <footer class="mock-compose"><span>Scrivi un messaggio</span></footer>
+            </div>
+            <div class="mock-people">
+              <small>Persone 2/5</small>
+              <div class="person">
+                <span class="ava a4">K</span>
+                <span><b>Kappa <i>(tu)</i></b><em>Online</em></span>
+              </div>
+              <div class="person dim">
+                <span class="ava a5">S</span>
+                <span><b>Sable</b><em>Offline</em></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a class="scroll-hint" href="#features">Scorri</a>
+    </section>
+
+    <section class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Foto</span><span>Schermo</span>
+        <span>Voce</span><span>Video</span><span>Gruppi</span><span>2 GB</span><span>Temi</span><span>Windows</span><span>Foto</span><span>Schermo</span>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <p class="kicker reveal"><span></span> Lo spazio</p>
+      <h2 class="section-title reveal">Tutto quello che serve.<br>Niente di più.</h2>
+      <div class="grid">
+        <article class="card reveal">
+          <div class="card-ico pulse">◎</div>
+          <h3>Chiamate vere</h3>
+          <p>Microfono, camera e condivisione schermo. I dispositivi hanno i nomi veri, non “Dispositivo 1”.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-ico">⌗</div>
+          <h3>Gruppi stretti</h3>
+          <p>Massimo cinque persone. Elenco a destra, chiamata insieme, come una stanza piccola.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-ico">▭</div>
+          <h3>File enormi</h3>
+          <p>Foto, GIF e file fino a 2 GB. Si aprono, si scaricano, restano tra voi.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-ico">◐</div>
+          <h3>Colori tuoi</h3>
+          <p>Nero, bianco, viola, blu, verde, rosa. L’interfaccia segue te, non una moda.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-ico">⊙</div>
+          <h3>Foto profilo</h3>
+          <p>La tua foto si vede in chat e nel gruppo. Anche se l’altro è offline.</p>
+        </article>
+        <article class="card reveal">
+          <div class="card-ico">⊞</div>
+          <h3>Un setup</h3>
+          <p>Un exe. Si installa in locale, si aggiorna da solo. Niente store, niente account mail.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="live" id="live">
+      <div class="live-copy">
+        <p class="kicker reveal"><span></span> Voce</p>
+        <h2 class="section-title reveal">Entra. Parla.<br>Resta.</h2>
+        <p class="reveal">Premi per parlare, togli l’eco, scegli microfono e cuffie. La chiamata di gruppo tiene tutti nello stesso respiro, con i volti a destra.</p>
+        <ul class="ticks reveal">
+          <li>Audio in uscita e microfono con i nomi Windows</li>
+          <li>Mutato e silenziato dal dock, come in una console</li>
+          <li>Stati: online, assente, non disturbare</li>
+        </ul>
+      </div>
+      <div class="live-stage reveal">
+        <div class="wave" id="wave"></div>
+        <div class="call-card">
+          <div class="call-top">
+            <span class="live-dot"></span>
+            In chiamata · Notte
+          </div>
+          <div class="call-faces">
+            <div class="face"><span>K</span><small>tu</small></div>
+            <div class="face talking"><span>M</span><small>Mare</small></div>
+            <div class="face"><span>V</span><small>Vento</small></div>
+          </div>
+          <div class="call-bar">
+            <button type="button">Microfono</button>
+            <button type="button">Audio</button>
+            <button type="button" class="danger">Chiudi</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat reveal">
+        <strong data-count="0" data-prefix="" data-suffix="">0</strong>
+        <span>secondi per entrare</span>
+      </div>
+      <div class="stat reveal">
+        <strong data-count="5">0</strong>
+        <span>persone per gruppo</span>
+      </div>
+      <div class="stat reveal">
+        <strong data-count="2" data-suffix=" GB">0</strong>
+        <span>limite file</span>
+      </div>
+      <div class="stat reveal">
+        <strong data-count="6">0</strong>
+        <span>colori</span>
+      </div>
+    </section>
+
+    <section class="themes" id="themes">
+      <p class="kicker reveal"><span></span> Pelle</p>
+      <h2 class="section-title reveal">Cambia luce.<br>Non cambia te.</h2>
+      <div class="swatches">
+        <button type="button" class="swatch on" data-tone="dark" style="--sw:#111; --fg:#f2f2f2">Nero</button>
+        <button type="button" class="swatch" data-tone="light" style="--sw:#f3f3f4; --fg:#161618">Bianco</button>
+        <button type="button" class="swatch" data-tone="purple" style="--sw:#2a1b3d; --fg:#c59bff">Viola</button>
+        <button type="button" class="swatch" data-tone="blue" style="--sw:#142433; --fg:#4aa3ff">Blu</button>
+        <button type="button" class="swatch" data-tone="green" style="--sw:#14241c; --fg:#3dcf7a">Verde</button>
+        <button type="button" class="swatch" data-tone="rose" style="--sw:#2a1520; --fg:#ff8fb1">Rosa</button>
+      </div>
+    </section>
+
+    <section class="get" id="get">
+      <div class="get-glow" aria-hidden="true"></div>
+      <p class="kicker reveal"><span></span> Download</p>
+      <h2 class="get-title" data-split>Prendilo.</h2>
+      <p class="lead reveal">Un file. Windows 10 o 11. Si installa in locale e si apre con nome e password.</p>
+      <a class="btn btn-huge magnetic" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
+        <span class="btn-shine"></span>
+        Scarica SolaxRD-Setup.exe
+      </a>
+      <p class="btn-meta reveal">~16 MB · aggiornamenti dall’app · niente mail</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <img src="media/icon.png" alt="">
+    <div>
+      <strong>SolaxRD</strong>
+      <span>Fatto per Windows. Resta sul tuo PC.</span>
+    </div>
+    <a href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">Download</a>
+  </footer>
+
+  <script src="js/site.js"></script>
+</body>
+</html>
