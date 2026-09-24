@@ -3,133 +3,84 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090014">
-  <meta name="description" content="SolaxRD per Windows, Android e iPhone. Stesso nome, stessa password. Scarica qui.">
+  <meta name="theme-color" content="#10243a">
+  <meta name="description" content="SolaxRD, slide per slide. Scarica per Windows, Android o iPhone.">
   <meta property="og:title" content="SolaxRD">
-  <meta property="og:description" content="Chat, voce e gruppi. Scarica per PC, Android o iPhone.">
+  <meta property="og:description" content="Chat, voce e gruppi. Tre download.">
   <meta property="og:image" content="media/icon.png">
   <title>SolaxRD</title>
   <link rel="icon" href="media/favicon.png">
   <link rel="apple-touch-icon" href="media/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Unbounded:wght@700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/burst.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/slides.css">
 </head>
 <body>
-  <div class="boot" id="boot">
-    <p id="boot-word">SOLAXRD</p>
-    <div class="boot-bar"><span id="boot-fill"></span></div>
-  </div>
-
-  <canvas id="dust" aria-hidden="true"></canvas>
-  <div class="wash" aria-hidden="true"></div>
-  <div class="floaters" aria-hidden="true">
-    <i></i><i></i><i></i><i></i><i></i><i></i>
-  </div>
-  <div class="cursor" id="cursor"></div>
-
-  <header class="top">
-    <a class="logo" href="#top"><img src="media/icon.png" alt=""> SolaxRD</a>
-    <a class="top-go" href="#get">Scarica</a>
-    <button class="burger" id="burger" type="button" aria-label="Apri il menu" aria-expanded="false"><span></span><span></span></button>
-  </header>
-  <nav class="sheet" id="sheet" hidden>
-    <a href="#cosa">Cosa fa</a>
-    <a href="#get">Download</a>
-    <a href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">PC</a>
-    <a href="download/SolaxRD.apk" download="SolaxRD.apk">Android</a>
-    <a href="download/SolaxRD.ipa" download="SolaxRD.ipa">iPhone</a>
-  </nav>
-
-  <main id="top">
-    <section class="hero">
-      <p class="eyebrow"><span></span> chat · voce · gruppi</p>
-      <h1 class="mega" id="mega" aria-label="SolaxRD">
-        <span>S</span><span>o</span><span>l</span><span>a</span><span>x</span><span>R</span><span>D</span>
-      </h1>
-      <p class="deck">Il tuo spazio, sul computer e in tasca. Un nome. Una password. Basta.</p>
-      <div class="hero-dl">
-        <a class="pill hot" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">PC</a>
-        <a class="pill" href="download/SolaxRD.apk" download="SolaxRD.apk">Android</a>
-        <a class="pill" href="download/SolaxRD.ipa" download="SolaxRD.ipa">iPhone</a>
-      </div>
-      <div class="orbit" aria-hidden="true">
-        <b></b>
-        <b></b>
-        <b></b>
-      </div>
+  <div class="deck" id="deck">
+    <section class="slide sea" data-slide>
+      <p class="kicker">01</p>
+      <h1><em>Solax</em>RD</h1>
+      <p class="line">Chat e chiamate. Un nome, una password.</p>
+      <button class="next" type="button" data-go="1">Avanti</button>
     </section>
 
-    <div class="tape" aria-hidden="true">
-      <div>
-        <span>VOCE</span><span>VIDEO</span><span>GRUPPI</span><span>2 GB</span><span>FOTO</span><span>TEMI</span>
-        <span>VOCE</span><span>VIDEO</span><span>GRUPPI</span><span>2 GB</span><span>FOTO</span><span>TEMI</span>
-      </div>
-    </div>
-    <div class="tape tape-back" aria-hidden="true">
-      <div>
-        <span>WINDOWS</span><span>ANDROID</span><span>IPHONE</span><span>SOLAXRD</span>
-        <span>WINDOWS</span><span>ANDROID</span><span>IPHONE</span><span>SOLAXRD</span>
-      </div>
-    </div>
-
-    <section class="cosa" id="cosa">
-      <h2>Si muove.<br>Come te.</h2>
-      <div class="bento">
-        <article class="tile t1">
-          <h3>Chiamate</h3>
-          <p>Microfono e camera, con i nomi veri dei dispositivi.</p>
-        </article>
-        <article class="tile t2">
-          <h3>Gruppi da 5</h3>
-          <p>Una stanza piccola. Tutti nello stesso respiro.</p>
-        </article>
-        <article class="tile t3">
-          <h3>File da 2 GB</h3>
-          <p>Foto, GIF, quello che vuoi, tra di voi.</p>
-        </article>
-        <article class="tile t4">
-          <h3>Tre schermi</h3>
-          <p>PC, Android, iPhone. Stesso account.</p>
-        </article>
-      </div>
+    <section class="slide sand" data-slide>
+      <p class="kicker">02</p>
+      <ul class="words">
+        <li>Voce</li>
+        <li>Gruppi da cinque</li>
+        <li>File fino a 2 GB</li>
+        <li>Foto che restano</li>
+      </ul>
+      <button class="next" type="button" data-go="2">Avanti</button>
     </section>
 
-    <section class="get" id="get">
-      <p class="eyebrow"><span></span> download</p>
-      <h2>Prendilo ora.</h2>
-      <div class="ports">
-        <a class="port" href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
-          <small>01</small>
+    <section class="slide mint" data-slide>
+      <p class="kicker">03</p>
+      <h2>Lo stesso account,<br>ovunque lo apri.</h2>
+      <div class="places">
+        <span>Windows</span>
+        <span>Android</span>
+        <span>iPhone</span>
+      </div>
+      <button class="next" type="button" data-go="3">Ai download</button>
+    </section>
+
+    <section class="slide ink" id="get" data-slide>
+      <p class="kicker">04</p>
+      <h2>Scarica.</h2>
+      <div class="files">
+        <a href="download/SolaxRD-Setup.exe" download="SolaxRD-Setup.exe">
+          <small>PC</small>
           <strong>Windows</strong>
-          <em>SolaxRD-Setup.exe</em>
-          <span data-size>PC</span>
+          <em data-size>SolaxRD-Setup.exe</em>
         </a>
-        <a class="port" href="download/SolaxRD.apk" download="SolaxRD.apk">
-          <small>02</small>
+        <a href="download/SolaxRD.apk" download="SolaxRD.apk">
+          <small>Telefono</small>
           <strong>Android</strong>
-          <em>SolaxRD.apk</em>
-          <span data-size-apk>Telefono</span>
+          <em data-size-apk>SolaxRD.apk</em>
         </a>
-        <a class="port" href="download/SolaxRD.ipa" download="SolaxRD.ipa">
-          <small>03</small>
-          <strong>iPhone</strong>
-          <em>SolaxRD.ipa</em>
-          <span data-size-ipa>Sideloadly o AltStore</span>
+        <a href="download/SolaxRD.ipa" download="SolaxRD.ipa">
+          <small>iPhone</small>
+          <strong>iOS</strong>
+          <em data-size-ipa>IPA · Sideloadly o AltStore</em>
         </a>
       </div>
     </section>
-  </main>
+  </div>
 
-  <footer>
-    <img src="media/icon.png" alt="">
-    <div>
-      <strong>SolaxRD</strong>
-      <span>Windows, Android, iPhone.</span>
-    </div>
-    <a href="#get">Download</a>
-  </footer>
-  <script src="js/burst.js"></script>
+  <header>
+    <a class="mark" href="#top"><img src="media/icon.png" alt=""> SolaxRD</a>
+    <p class="pos" id="pos">01 / 04</p>
+    <a class="jump" href="#get" id="to-get">Download</a>
+  </header>
+
+  <div class="arrows">
+    <button type="button" id="prev" aria-label="Slide precedente">←</button>
+    <button type="button" id="next" aria-label="Slide successiva">→</button>
+  </div>
+  <div class="dots" id="dots"></div>
+  <script src="js/slides.js"></script>
 </body>
 </html>
