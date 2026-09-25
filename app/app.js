@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.6";
+const RELEASE_NAME = "1.0.7";
 const bootAt = Date.now();
 
 const els = {
@@ -1256,12 +1256,16 @@ function paintDirectCall() {
   });
 }
 
-function showLiveUI() {
+function openCallStage() {
   const stage = document.querySelector(".stage");
   if (stage) stage.classList.add("in-call");
-  if (els.thread) els.thread.hidden = false;
   if (els.welcome) els.welcome.hidden = true;
+  if (els.thread) els.thread.hidden = false;
   els.live.hidden = false;
+}
+
+function showLiveUI() {
+  openCallStage();
   els.call.disabled = true;
   const people = $("live-people");
   if (people) people.hidden = false;
@@ -2413,10 +2417,11 @@ async function startGroupCall() {
   if (state.phase !== "idle") return;
   state.phase = "out";
   joinGroupRoom(state.group, state.me.name);
-  els.live.hidden = false;
+  openCallStage();
   els.hangup.disabled = false;
   els.call.disabled = true;
   setStatus(`Chiamo ${state.group.name}…`);
+  paintLivePeople();
   try { startRing(); } catch (e) { /* optional */ }
   try {
     await waitReady();
@@ -2486,8 +2491,9 @@ async function startCall(rawName) {
   if (state.phase !== "idle") return;
   state.phase = "out";
   state.remoteLabel = String(rawName || "").trim();
-  els.live.hidden = false;
+  openCallStage();
   setStatus(`Chiamo ${state.remoteLabel}…`);
+  paintDirectCall();
   els.hangup.disabled = false;
   els.call.disabled = true;
   try { startRing(); } catch (e) { /* ring is optional */ }
@@ -2797,7 +2803,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.6.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.7.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";

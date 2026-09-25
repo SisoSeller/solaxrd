@@ -542,7 +542,7 @@ body.compact .chat-row { padding: 6px 8px; }
 }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .chips button { height: 32px; border-radius: 999px; }
-.live { margin-top: auto; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.live { border-top: 0; display: flex; flex-direction: column; gap: 8px; }
 .stage-video { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
 .live-people {
   display: grid;
@@ -714,27 +714,38 @@ html.phone #boot { display: none !important; }
 .boot-screen { background: #111214; color: #fff; }
 .boot-mark { width: 92px; height: 92px; border-radius: 24px; }
 .boot-screen p { margin: 14px 0 0; font-size: 22px; font-weight: 700; }
-.stage { position: relative; }
+.stage { position: relative; display: flex; flex-direction: column; min-height: 0; }
 .live {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
+  position: relative;
+  z-index: 5;
+  order: -1;
   margin: 0;
-  padding: 28px 18px 22px;
-  background: #000;
+  padding: 12px 14px 10px;
+  background: #111214;
   border: 0;
+  border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 18px;
+  justify-content: flex-start;
+  gap: 10px;
+  flex: 0 0 auto;
+  max-height: min(36vh, 280px);
+  min-height: 0;
 }
-.live .stage-video { flex: 1; min-height: 0; align-items: center; justify-content: center; }
+.live[hidden] { display: none !important; }
+.live .stage-video {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
 .live-people {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 28px;
+  gap: 16px 22px;
   width: 100%;
   background: transparent;
 }
@@ -742,35 +753,36 @@ html.phone #boot { display: none !important; }
   background: transparent;
   border: 0;
   min-height: 0;
-  width: 140px;
+  width: 88px;
   padding: 0;
 }
 .live-tile .tile-pic,
 .live-tile .row-avatar,
 .live-tile .tile-letter {
-  width: 120px;
-  height: 120px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
 }
-.live-tile small { color: #fff; font-size: 14px; }
+.live-tile small { color: #fff; font-size: 13px; }
 .live-actions {
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: 8px;
   background: #1e1f22;
-  border-radius: 28px;
-  padding: 10px 14px;
+  border-radius: 22px;
+  padding: 8px 12px;
   width: fit-content;
-  max-width: calc(100% - 16px);
+  max-width: calc(100% - 12px);
   margin: 0 auto;
   overflow: visible;
+  flex: 0 0 auto;
 }
-.live-actions #status { color: #fff; }
+.live-actions #status { color: #fff; white-space: nowrap; }
 #hangup {
   width: auto;
   min-width: 72px;
-  height: 40px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 0 16px;
   border-radius: 999px;
   background: #da373c;
   color: #fff;
@@ -778,47 +790,25 @@ html.phone #boot { display: none !important; }
   flex: none;
   font-weight: 700;
   line-height: 1;
+  font-size: 14px;
 }
-.live video { border-radius: 16px; max-height: 52vh; background: #000; object-fit: contain; }
-#remote-video:not([hidden]) { width: min(100%, 880px); display: block; }
+.live video { border-radius: 12px; max-height: 28vh; background: #000; object-fit: contain; }
+#remote-video:not([hidden]) { width: min(100%, 640px); display: block; }
 #local-video:not([hidden]) {
-  position: absolute; right: 16px; bottom: 96px; width: 168px; height: 112px; z-index: 6;
+  position: absolute; right: 16px; bottom: 96px; width: 140px; height: 96px; z-index: 6;
   max-height: none; box-shadow: 0 8px 24px rgba(0,0,0,.45);
 }
 .stage.in-call {
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 .stage.in-call > .live {
   position: relative;
   inset: auto;
   z-index: 5;
   flex: 0 0 auto;
-  max-height: min(38vh, 340px);
-  min-height: 150px;
-  padding: 12px 14px 10px;
-  justify-content: flex-start;
-  gap: 10px;
-}
-.stage.in-call > .live .stage-video { flex: 1; min-height: 0; }
-.stage.in-call > .live .live-tile .tile-pic,
-.stage.in-call > .live .live-tile .row-avatar,
-.stage.in-call > .live .live-tile .tile-letter {
-  width: 72px;
-  height: 72px;
-}
-.stage.in-call > .live .live-tile { width: 96px; }
-.stage.in-call > .live .live-actions {
-  margin: 0 auto;
-  padding: 8px 14px;
-  border-radius: 22px;
-  max-width: calc(100% - 12px);
-}
-.stage.in-call #hangup {
-  height: 36px;
-  min-width: 68px;
-  padding: 0 16px;
-  font-size: 14px;
+  max-height: min(36vh, 280px);
 }
 .stage.in-call > .thread {
   position: relative;
@@ -827,7 +817,8 @@ html.phone #boot { display: none !important; }
   min-height: 0;
   display: flex !important;
   background: var(--bg);
-  border-top: 1px solid var(--line);
+  border-top: 0;
+  order: 0;
 }
 .stage.in-call > .welcome { display: none !important; }
 .stage.in-call #local-video:not([hidden]) {
