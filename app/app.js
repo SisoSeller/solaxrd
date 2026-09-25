@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.7";
+const RELEASE_NAME = "1.0.8";
 const bootAt = Date.now();
 
 const els = {
@@ -37,7 +37,7 @@ const els = {
   status: $("status"),
   mute: $("mute"),
   camera: $("camera"),
-  screen: $("screen"),
+  screen: null,
   hangup: $("hangup"),
   mic: $("mic"),
   speaker: $("speaker"),
@@ -1230,8 +1230,13 @@ function paintDirectCall() {
   const box = $("live-people");
   if (!box) return;
   const names = [];
-  if (state.remoteLabel) names.push(state.remoteLabel);
-  if (state.me && state.me.name && !names.some((name) => sameName(name, state.me.name))) names.push(state.me.name);
+  if (state.me && state.me.name) names.push(state.me.name);
+  const remoteLive = state.phase === "live"
+    && state.remoteLabel
+    && ((els.remoteAudio && els.remoteAudio.srcObject) || (els.remoteVideo && els.remoteVideo.srcObject));
+  if (remoteLive && !names.some((name) => sameName(name, state.remoteLabel))) {
+    names.push(state.remoteLabel);
+  }
   box.hidden = false;
   box.replaceChildren();
   names.forEach((name) => {
@@ -1294,13 +1299,21 @@ function showIdleUI() {
 
 function updateToggles() {
   const live = state.phase === "live";
-  els.mute.disabled = !live || !!state.settings.pushToTalk;
-  els.camera.disabled = !live;
-  els.screen.disabled = !live;
-  els.hangup.disabled = state.phase === "idle";
-  els.mute.textContent = state.settings.pushToTalk ? (state.ptt ? "Parli" : "Tieni spazio") : (state.micOn ? "Muto" : "Riattiva");
-  els.camera.textContent = state.camOn ? "Chiudi camera" : "Camera";
-  els.screen.textContent = state.screenOn ? "Ferma" : "Condividi";
+  if (els.mute) els.mute.disabled = !live || !!state.settings.pushToTalk;
+  if (els.camera) els.camera.disabled = !live;
+  if (els.hangup) els.hangup.disabled = state.phase === "idle";
+  const deafBtn = $("deaf-call");
+  if (deafBtn) {
+    deafBtn.disabled = !live;
+    deafBtn.textContent = state.deaf ? "Riattiva audio" : "Muta audio";
+  }
+  if (els.mute) {
+    els.mute.textContent = state.settings.pushToTalk
+      ? (state.ptt ? "Parli" : "Tieni spazio")
+      : (state.micOn ? "Muto" : "Riattiva");
+  }
+  if (els.camera) els.camera.textContent = state.camOn ? "Chiudi camera" : "Camera";
+  if (els.hangup) els.hangup.textContent = "Esci";
 }
 
 function hideRemoteVideo() {
@@ -2504,9 +2517,16 @@ async function startCall(rawName) {
     if (!data.ok) { endCall(data.error || "Chiamata non partita."); return; }
     if (data.peerId === state.me.peerId) { endCall("Non puoi chiamare te stesso."); return; }
     if (isBlocked(data.name)) { endCall("Hai bloccato questo nome."); return; }
+    await pullOnline().catch(() => {});
+    const online = onlineOf(data.name);
+    if (!online || !online.on) {
+      endCall("Non è online adesso. Deve avere SolaxRD aperto.");
+      return;
+    }
     state.remoteLabel = data.name;
     state.remotePeerId = data.peerId;
     setStatus(`Chiamo ${data.name}…`);
+    paintDirectCall();
     try { await waitReady(); } catch (e) { endCall("Non sei in linea. Aspetta 'In linea' in alto."); return; }
     if (!state.peer || state.peer.disconnected || state.peer.destroyed) {
       endCall("Non sei in linea. Aspetta 'In linea' in alto.");
@@ -2519,7 +2539,7 @@ async function startCall(rawName) {
       endCall("Non raggiungibile. Deve avere SolaxRD aperto.");
       return;
     }
-    later(() => { if (state.phase === "out") endCall("Nessuna risposta."); }, 40000);
+    later(() => { if (state.phase === "out") endCall("Nessuna risposta."); }, 25000);
   } catch (e) {
     if (state.phase === "out") endCall("Chiamata non partita. Riprova.");
   }
@@ -2803,7 +2823,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.7.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.8.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
@@ -2908,9 +2928,9 @@ async function loop() {
       if (ticks % 8 === 0) await checkUpdate();
     } catch (e) { /* next round */ }
     if (!state.me || state.loopGen !== gen) return;
-    window.setTimeout(run, 8000);
+    window.setTimeout(run, 5000);
   };
-  window.setTimeout(run, 10000);
+  window.setTimeout(run, 4000);
 }
 
 function paintMe(session) {
@@ -3600,7 +3620,12 @@ if ($("titlebar-drag")) $("titlebar-drag").addEventListener("dblclick", () => de
 window.addEventListener("contextmenu", (event) => event.preventDefault());
 els.mute.addEventListener("click", toggleMute);
 els.camera.addEventListener("click", toggleCamera);
-els.screen.addEventListener("click", toggleScreen);
+if ($("deaf-call")) {
+  $("deaf-call").addEventListener("click", async () => {
+    state.deaf = !state.deaf;
+    await applyPresence();
+  });
+}
 els.hangup.addEventListener("click", () => endCall("Chiamata chiusa."));
 $("accept").addEventListener("click", acceptCall);
 $("reject").addEventListener("click", () => {
@@ -3649,7 +3674,13 @@ window.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("keyup", (event) => { if (event.key === " ") setTalk(false); });
-window.addEventListener("beforeunload", () => { try { state.link && state.link.send({ t: "hangup" }); } catch (e) { /* leaving */ } });
+window.addEventListener("beforeunload", () => {
+  try { state.link && state.link.send({ t: "hangup" }); } catch (e) { /* leaving */ }
+  try { fetch("/api/offline", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) { /* leave */ }
+});
+window.addEventListener("pagehide", () => {
+  try { fetch("/api/offline", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: "{}" }); } catch (e) { /* leave */ }
+});
 if (navigator.mediaDevices) navigator.mediaDevices.addEventListener("devicechange", () => { refreshDevices().catch(() => {}); });
 
 async function boot() {

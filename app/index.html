@@ -132,12 +132,11 @@
           <video id="local-video" autoplay playsinline muted hidden></video>
         </div>
         <div class="live-actions">
-          <label class="stream-vol">Stream <input id="stream-vol" type="range" min="0" max="100" step="5" value="100"></label>
           <span id="status" aria-live="polite">In chiamata</span>
           <button class="ghost" id="mute" type="button">Muto</button>
+          <button class="ghost" id="deaf-call" type="button">Muta audio</button>
           <button class="ghost" id="camera" type="button">Camera</button>
-          <button class="ghost" id="screen" type="button">Condividi</button>
-          <button class="danger" id="hangup" type="button">Chiudi</button>
+          <button class="danger" id="hangup" type="button">Esci</button>
         </div>
       </div>
     </main>
@@ -312,7 +311,7 @@
           <h2>Sistema</h2>
           <button type="button" class="switch" id="set-top">Sempre in primo piano</button>
           <button type="button" class="switch" id="set-startup">Apri all’avvio di Windows</button>
-          <p id="version-label" class="lead">1.0.7</p>
+          <p id="version-label" class="lead">1.0.8</p>
           <div class="actions">
             <button type="button" class="primary" id="check-update">Controlla aggiornamento</button>
             <button type="button" class="ghost" id="clear-chats">Svuota elenco chat</button>

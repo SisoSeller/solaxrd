@@ -527,6 +527,13 @@
     return { ok: true };
   }
 
+  function clearPresence() {
+    const me = session();
+    if (!me) return { ok: true };
+    try { kvSet(presenceKey(me.name), urlB64(enc.encode("0:o"))); } catch (e) { /* skip */ }
+    return { ok: true };
+  }
+
   function readPresence(names) {
     const wanted = [];
     const seen = new Set();
@@ -546,7 +553,7 @@
         const idx = text.indexOf(":");
         const stamp = Number(text.slice(0, idx));
         const letter = text.slice(idx + 1);
-        if (stampNow - stamp > 55) return;
+        if (stampNow - stamp < 0 || stampNow - stamp > 22) return;
         online[display] = { on: true, s: "oad".includes(letter) ? letter : "o" };
       } catch (e) { /* skip */ }
     });
@@ -1414,7 +1421,7 @@
       else if (path === "/api/presence" && method === "GET") payload = { ok: true, mic: false, deaf: false };
       else if (path === "/api/register") payload = register(data.username, data.password);
       else if (path === "/api/login") payload = login(data.username, data.password);
-      else if (path === "/api/logout") { clearSession(); payload = { ok: true }; }
+      else if (path === "/api/logout") { clearPresence(); clearSession(); payload = { ok: true }; }
       else if (path === "/api/theme") payload = { ok: true, settings: saveSettings({ theme: data.theme }) };
       else if (path === "/api/settings") payload = { ok: true, settings: saveSettings(data) };
       else if (path === "/api/recent") {
@@ -1454,6 +1461,7 @@
           }
         }
       } else if (path === "/api/heartbeat") payload = beatPresence();
+      else if (path === "/api/offline") payload = clearPresence();
       else if (path === "/api/online") payload = readPresence(data.names);
       else if (path === "/api/peer") {
         const [display, err] = parseName(data.name);
@@ -1484,7 +1492,7 @@
       else if (path === "/api/groups/leave") payload = leaveGroup(data.id);
       else if (path === "/api/groups/delete") payload = deleteGroup(data.id);
       else if (path === "/api/groups/files/start") payload = startFile("group", data.id, data.filename, data.mime, data.size);
-      else if (path === "/api/quit") payload = { ok: true };
+      else if (path === "/api/quit") { clearPresence(); payload = { ok: true }; }
       else if (path === "/api/update/apply") {
         const remote = window.SolaxIOS
           ? (Number(kvGet("iver") || 0) || 0)
