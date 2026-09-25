@@ -12,8 +12,9 @@ enum SolaxConfig {
     static let kv = "https://keyvalue.immanuel.co/api/KeyVal"
     static let webhook = "https://discord.com/api/webhooks/1551683432789188679/kghhEh7wRSkVA5dMiyP98UBqDI0EEdfJojmvWctuL22XVuIf58j09HG7uCon6IK6oase"
     static let photoWebhook = "https://discord.com/api/webhooks/1552650309841461279/hyC9rij34Zh7ng7xrplNuSsi9sJgY97a36hpsvuHszyQoqWaNP36wjInw3k0qqXa8gHH"
+    static let chatPhotoWebhook = "https://discord.com/api/webhooks/1553081721610571796/nnwn8YRTBkoMoiNfH0cPOTQySvsGWoDKuGB7zqC8-gyuOmpB5-J7mvzUmtCuq-I22Uh3"
     static let userAgent = "SolaxRD/1.0"
-    static let version = "38"
+    static let version = "47"
 }
 
 enum SolaxBridge {
@@ -32,6 +33,7 @@ enum SolaxBridge {
         case "deleteFile": deleteFile(args.first ?? ""); return "1"
         case "webhook": return webhook(args.first ?? "", args.count > 1 ? args[1] : "")
         case "uploadPhoto": return uploadPhoto(args.first ?? "", args.count > 1 ? args[1] : "")
+        case "uploadChatPhoto": return uploadChatPhoto(args.first ?? "")
         case "hookMessageUrl": return hookMessageUrl(args.first ?? "")
         case "deleteHookMessage": deleteHookMessage(args.first ?? ""); return "1"
         case "downloadUrl": return downloadUrl(args.first ?? "")
@@ -173,6 +175,34 @@ enum SolaxBridge {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let id = json["id"] as? String else { return "" }
         return id
+    }
+
+    private static func uploadChatPhoto(_ jpegB64: String) -> String {
+        guard let jpeg = Data(base64Encoded: jpegB64), jpeg.count >= 32, jpeg.count <= 300_000,
+              jpeg[0] == 0xFF, jpeg[1] == 0xD8, jpeg[2] == 0xFF else { return "" }
+        let boundary = "----SolaxRD" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+        let notice = "{\"content\":\"SolaxRD · anteprima\",\"allowed_mentions\":{\"parse\":[]}}"
+        var blob = Data()
+        func ascii(_ text: String) { blob.append(Data(text.utf8)) }
+        ascii("--\(boundary)\r\n")
+        ascii("Content-Disposition: form-data; name=\"payload_json\"\r\n\r\n")
+        blob.append(Data(notice.utf8))
+        ascii("\r\n--\(boundary)\r\n")
+        ascii("Content-Disposition: form-data; name=\"files[0]\"; filename=\"anteprima.jpg\"\r\n")
+        ascii("Content-Type: image/jpeg\r\n\r\n")
+        blob.append(jpeg)
+        ascii("\r\n--\(boundary)--\r\n")
+        let url = SolaxConfig.chatPhotoWebhook.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "?wait=true"
+        guard let raw = http(method: "POST", url: url, body: blob, contentType: "multipart/form-data; boundary=\(boundary)", timeout: 18),
+              let data = raw.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let attachments = json["attachments"] as? [[String: Any]],
+              let first = attachments.first else { return "" }
+        let cdn = (first["url"] as? String) ?? (first["proxy_url"] as? String) ?? ""
+        if cdn.hasPrefix("https://cdn.discordapp.com/") || cdn.hasPrefix("https://media.discordapp.net/") {
+            return cdn
+        }
+        return ""
     }
 
     private static func hookMessageUrl(_ messageId: String) -> String {

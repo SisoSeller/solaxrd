@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.3";
+const RELEASE_NAME = "1.0.4";
 const bootAt = Date.now();
 
 const els = {
@@ -1798,9 +1798,19 @@ function attachLink(link) {
 }
 
 let peerBoot = 0;
+let peerRestartAt = 0;
+let peerRestartCount = 0;
 
 function softRestartPeer(delayMs) {
   if (state.loggingOut) return;
+  const now = Date.now();
+  if (now - peerRestartAt < 3500) return;
+  if (peerRestartCount > 12) {
+    els.net.textContent = "Offline";
+    return;
+  }
+  peerRestartAt = now;
+  peerRestartCount += 1;
   const boot = ++peerBoot;
   state.peerReady = false;
   const old = state.peer;
@@ -1842,6 +1852,7 @@ function startPeer() {
     if (boot !== peerBoot || state.peer !== peer) return;
     state.peerReady = true;
     state.retries = 0;
+    peerRestartCount = 0;
     els.net.textContent = "In linea";
     shareAvatars();
   });
@@ -2762,7 +2773,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.3.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.4.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";

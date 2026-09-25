@@ -113,6 +113,7 @@ final class MainViewController: UIViewController, WKUIDelegate, WKNavigationDele
       readFile: function (name) { return solaxFile("read", name, ""); },
       webhook: function (kind, name) { return solaxCall("webhook", [kind, name || ""]); },
       uploadPhoto: function (name, jpeg) { return solaxCall("uploadPhoto", [name, jpeg]); },
+      uploadChatPhoto: function (jpeg) { return solaxCall("uploadChatPhoto", [jpeg]); },
       hookMessageUrl: function (id) { return solaxCall("hookMessageUrl", [id]); },
       deleteHookMessage: function (id) { solaxCall("deleteHookMessage", [id]); },
       downloadUrl: function (url) { return solaxCall("downloadUrl", [url]); },

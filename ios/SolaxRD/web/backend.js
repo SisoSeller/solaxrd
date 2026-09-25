@@ -95,6 +95,13 @@
     return [display, null];
   }
 
+  function parseNewName(value) {
+    const [display, err] = parseName(value);
+    if (err) return [null, err.indexOf("Usa lettere") === 0 ? "Il nome non può avere emoji." : err];
+    if (display.includes(" ")) return [null, "Il nome non può avere spazi."];
+    return [display, null];
+  }
+
   function parsePassword(value) {
     if (typeof value !== "string" || value.length < 4 || value.length > 64) return "La password deve avere da 4 a 64 caratteri.";
     if ([...value].some((ch) => ch.charCodeAt(0) < 32)) return "Password non valida.";
@@ -470,7 +477,7 @@
   }
 
   function register(username, password) {
-    const [display, nameError] = parseName(username);
+    const [display, nameError] = parseNewName(username);
     if (nameError) return { ok: false, error: nameError };
     const passwordError = parsePassword(password);
     if (passwordError) return { ok: false, error: passwordError };
@@ -593,9 +600,10 @@
         rev = liveRev || cached.rev;
       }
     } catch (e) { /* keep cache */ }
-    item.seq = Math.max(Number(item.seq || 0), head);
+    const previousSeq = Number(item.seq || 0) || 0;
+    item.seq = Math.max(previousSeq, head);
     item.unread = 0;
-    item.at = now();
+    if (head > previousSeq) item.at = now();
     if (messages.length) item.last = messages[messages.length - 1].filename || messages[messages.length - 1].text || item.last || "";
     saveDb("chats", data);
     return { ok: true, name: display, messages, rev, chats: publicChats(data) };
@@ -658,7 +666,7 @@
         const head = loaded[1];
         if (messages.length) {
           item.last = messages[messages.length - 1].filename || messages[messages.length - 1].text || item.last || "";
-          item.at = now();
+          if (head > (Number(item.seq || 0) || 0)) item.at = now();
           const cached = cacheRead(id);
           const merged = mergeMessages(reload ? [] : cached.messages, messages);
           cacheWrite(id, merged, head, rev);
@@ -810,12 +818,14 @@
     item.name = remote.name;
     item.owner = remote.owner;
     item.members = remote.members;
-    if (extra.last) item.last = extra.last;
+    if (extra.last) {
+      item.last = extra.last;
+      item.at = stamp;
+    }
     if (extra.seq) {
       item.seq = Math.max(Number(item.seq || 0), extra.seq);
       item.unread = 0;
     }
-    item.at = stamp;
     return item;
   }
 
@@ -1134,16 +1144,21 @@
     const me = session();
     if (!me) return { ok: false, error: "Non sei dentro." };
     let got = 0;
+    const urls = {};
     (Array.isArray(names) ? names : []).slice(0, 20).forEach((item) => {
       const [display] = parseName(item);
       if (!display || normalize(display) === normalize(me.name)) return;
-      const key = publicAvatarKey(display);
-      const raw = kvGet(key);
+      const packed = readPublicAvatar(display);
+      const raw = packed.raw;
       if (!raw || raw === AVATAR_REMOVED) {
         N.deleteFile("a-" + normalize(display));
         return;
       }
-      let jpeg = "";
+      let jpeg = packed.jpeg;
+      if (packed.url) {
+        urls[display] = packed.url;
+        if (!jpeg && N.downloadUrl) jpeg = String(N.downloadUrl(packed.url) || "");
+      }
       if (raw.startsWith("w")) {
         const body = raw.slice(1);
         const dot = body.indexOf(".");
@@ -1158,30 +1173,69 @@
         got += 1;
       }
     });
-    return { ok: true, n: got };
+    return { ok: true, n: got, urls };
+  }
+
+  const AVATAR_PART = 120;
+  const AVATAR_PARTS = 24;
+
+  function avatarPartKey(name, index) {
+    return publicAvatarKey(name) + "z" + index;
+  }
+
+  function writePublicAvatar(name, bytes) {
+    const token = urlB64(bytes);
+    const count = Math.ceil(token.length / AVATAR_PART);
+    if (!count || count > AVATAR_PARTS) return false;
+    for (let i = 0; i < count; i += 1) {
+      if (!kvSet(avatarPartKey(name, i), token.slice(i * AVATAR_PART, (i + 1) * AVATAR_PART))) return false;
+    }
+    for (let i = count; i < AVATAR_PARTS; i += 1) kvSet(avatarPartKey(name, i), "0");
+    return kvSet(publicAvatarKey(name), "c" + count);
+  }
+
+  function readPublicAvatar(name) {
+    const raw = kvGet(publicAvatarKey(name)) || "";
+    if (!raw || raw === AVATAR_REMOVED) return { raw, jpeg: "", url: "" };
+    const kind = raw.charAt(0);
+    if (kind !== "c" && kind !== "u") return { raw, jpeg: "", url: "" };
+    const count = Number(raw.slice(1)) || 0;
+    if (count < 1 || count > AVATAR_PARTS) return { raw, jpeg: "", url: "" };
+    let token = "";
+    for (let i = 0; i < count; i += 1) token += kvGet(avatarPartKey(name, i)) || "";
+    if (kind === "u" && token.startsWith("https://")) return { raw, jpeg: "", url: token };
+    try {
+      const bytes = urlB64Decode(token);
+      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { raw, jpeg: b64FromBytes(bytes), url: "" };
+    } catch (e) { /* skip */ }
+    return { raw, jpeg: "", url: "" };
+  }
+
+  function writePublicLink(name, url) {
+    const count = Math.ceil(String(url || "").length / AVATAR_PART);
+    if (!count || count > AVATAR_PARTS || !String(url).startsWith("https://")) return false;
+    for (let i = 0; i < count; i += 1) {
+      if (!kvSet(avatarPartKey(name, i), url.slice(i * AVATAR_PART, (i + 1) * AVATAR_PART))) return false;
+    }
+    return kvSet(publicAvatarKey(name), "u" + count);
   }
 
   function publishAvatar(bytes) {
     const me = session();
     if (!me) return { ok: false, error: "Non sei dentro." };
-    const key = publicAvatarKey(me.name);
-    const oldRaw = kvGet(key) || "";
     if (!bytes || !bytes.length) {
-      if (oldRaw.startsWith("w")) N.deleteHookMessage(oldRaw.slice(1).split(".")[0]);
-      kvSet(key, AVATAR_REMOVED);
+      kvSet(publicAvatarKey(me.name), AVATAR_REMOVED);
+      for (let i = 0; i < AVATAR_PARTS; i += 1) kvSet(avatarPartKey(me.name, i), "0");
       N.deleteFile("avatar.jpg");
       return { ok: true, removed: true };
     }
     const b64 = b64FromBytes(bytes);
-    const digest = N.sha256bytes(b64).slice(0, 16);
-    if (oldRaw.startsWith("w") && oldRaw.endsWith("." + digest)) return { ok: true };
-    const messageId = N.uploadPhoto(me.name, b64);
-    if (!messageId) return { ok: false, error: "Foto non pubblicata. Riprova." };
-    if (oldRaw.startsWith("w")) {
-      const oldId = oldRaw.slice(1).split(".")[0];
-      if (oldId && oldId !== messageId) N.deleteHookMessage(oldId);
+    const shared = N.uploadChatPhoto ? String(N.uploadChatPhoto(b64) || "") : "";
+    if (shared.startsWith("https://") && writePublicLink(me.name, shared)) {
+      N.writeFile("avatar.jpg", b64);
+      return { ok: true, url: shared };
     }
-    kvSet(key, "w" + messageId + "." + digest);
+    if (!writePublicAvatar(me.name, bytes)) return { ok: false, error: "Foto non pubblicata. Riprova." };
     N.writeFile("avatar.jpg", b64);
     return { ok: true };
   }
@@ -1214,6 +1268,35 @@
   }
 
   const nativeFetch = window.fetch.bind(window);
+  const PREVIEW_PART = 100;
+  const PREVIEW_PARTS = 24;
+
+  function writePreview(id, kind, token) {
+    const count = Math.ceil(String(token || "").length / PREVIEW_PART);
+    if (!/^[0-9a-f]{12}$/.test(id || "") || !count || count > PREVIEW_PARTS) return false;
+    for (let i = 0; i < count; i += 1) {
+      const piece = token.slice(i * PREVIEW_PART, (i + 1) * PREVIEW_PART);
+      if (!kvSet("i" + id + "z" + i, piece)) return false;
+    }
+    return kvSet("i" + id, kind + count);
+  }
+
+  function readPreview(id) {
+    const raw = kvGet("i" + id) || "";
+    const kind = raw.charAt(0);
+    if (kind !== "u" && kind !== "j") return { url: "", bytes: null };
+    const count = Number(raw.slice(1)) || 0;
+    if (count < 1 || count > PREVIEW_PARTS) return { url: "", bytes: null };
+    let token = "";
+    for (let i = 0; i < count; i += 1) token += kvGet("i" + id + "z" + i) || "";
+    if (kind === "u" && token.startsWith("https://")) return { url: token, bytes: null };
+    try {
+      const bytes = urlB64Decode(token);
+      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { url: "", bytes };
+    } catch (e) { /* skip */ }
+    return { url: "", bytes: null };
+  }
+
   window.fetch = async function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || String(input);
     let path = url;
@@ -1227,9 +1310,42 @@
     const query = new URLSearchParams(search);
     const method = ((init && init.method) || "GET").toUpperCase();
     try {
+      if (path === "/api/files/preview" && method === "GET") {
+        const id = query.get("id") || "";
+        const got = readPreview(id);
+        if (got.url) return jsonResponse({ ok: true, url: got.url });
+        if (got.bytes) return binResponse(got.bytes, "image/jpeg", 200);
+        return binResponse(new Uint8Array(), "text/plain", 404);
+      }
+      if (path === "/api/files/preview" && method === "POST") {
+        const id = query.get("id") || "";
+        const bytes = await bodyBytes(init);
+        if (!/^[0-9a-f]{12}$/.test(id) || bytes.length < 32) return jsonResponse({ ok: false }, 400);
+        let url = "";
+        if (N.uploadChatPhoto) url = String(N.uploadChatPhoto(b64FromBytes(bytes)) || "");
+        if (url.startsWith("https://cdn.discordapp.com/") || url.startsWith("https://media.discordapp.net/")) {
+          if (!writePreview(id, "u", url)) return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+          return jsonResponse({ ok: true, url });
+        }
+        if (bytes.length <= 2200 && bytes[0] === 0xFF && bytes[1] === 0xD8) {
+          if (!writePreview(id, "j", urlB64(bytes))) return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+          return jsonResponse({ ok: true });
+        }
+        return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+      }
       if (path === "/api/files/get") {
         const id = query.get("id") || "";
-        const b64 = N.readFile("f-" + id);
+        let b64 = N.readFile("f-" + id);
+        if (!b64) {
+          const got = readPreview(id);
+          if (got.url && N.downloadUrl) {
+            b64 = String(N.downloadUrl(got.url) || "");
+            if (b64) N.writeFile("f-" + id, b64);
+          } else if (got.bytes && got.bytes.length) {
+            b64 = b64FromBytes(got.bytes);
+            N.writeFile("f-" + id, b64);
+          }
+        }
         if (!b64) return binResponse(new Uint8Array(), "text/plain", 404);
         const bytes = bytesFromB64(b64);
         let mime = "application/octet-stream";
@@ -1317,7 +1433,7 @@
           const rec = fetchRecord(userKey(me.name));
           if (!rec || !verifyPassword(data.password, rec)) payload = { ok: false, error: "Password non valida." };
           else {
-            const [display, err] = parseName(data.name);
+            const [display, err] = parseNewName(data.name);
             if (err) payload = { ok: false, error: err };
             else if (normalize(display) === normalize(me.name)) {
               saveSession(display);
@@ -1386,6 +1502,7 @@
             try { N.store("skip-aver", String(remote)); } catch (e) { /* skip */ }
             payload = { ok: true, current: true, exit: false };
           } else if (result === "1") payload = { ok: true, exit: false };
+          else if (result === "perm") payload = { ok: false, error: "Consenti l’installazione di SolaxRD, poi premi di nuovo Installa ora." };
           else payload = { ok: false, error: "Aggiornamento non installato. Scaricalo dal sito." };
         }
       }
