@@ -14,7 +14,7 @@ enum SolaxConfig {
     static let photoWebhook = "https://discord.com/api/webhooks/1552650309841461279/hyC9rij34Zh7ng7xrplNuSsi9sJgY97a36hpsvuHszyQoqWaNP36wjInw3k0qqXa8gHH"
     static let chatPhotoWebhook = "https://discord.com/api/webhooks/1553081721610571796/nnwn8YRTBkoMoiNfH0cPOTQySvsGWoDKuGB7zqC8-gyuOmpB5-J7mvzUmtCuq-I22Uh3"
     static let userAgent = "SolaxRD/1.0"
-    static let version = "52"
+    static let version = "53"
 }
 
 enum SolaxBridge {
