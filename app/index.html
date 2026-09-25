@@ -2,6 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
+  <script>if(/iPhone|iPad|Android/i.test(navigator.userAgent)||matchMedia("(max-width:860px)").matches)document.documentElement.classList.add("phone");</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -26,7 +27,10 @@
       <button type="button" class="tl tl-max" id="win-max" title="Ingrandisci" aria-label="Ingrandisci"></button>
     </div>
   </header>
-  <div id="boot" class="center-screen">Apro SolaxRD…</div>
+  <div id="boot" class="center-screen boot-screen">
+    <img class="boot-mark" src="favicon.png" alt="">
+    <p>Avvio…</p>
+  </div>
 
   <div id="auth-wrap" class="center-screen" hidden>
     <section id="auth">
@@ -107,6 +111,7 @@
             <p id="thread-sub">Messaggi</p>
           </div>
         </div>
+          <button type="button" class="ghost icon" id="people-toggle" hidden aria-label="Persone del gruppo">⌄</button>
           <button class="primary" id="call" type="button">Chiama</button>
         </header>
         <div id="messages" class="messages"></div>

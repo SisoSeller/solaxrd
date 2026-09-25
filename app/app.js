@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+const RELEASE_NAME = "1.0.0 release";
+const bootAt = Date.now();
 
 const els = {
   boot: $("boot"),
@@ -330,6 +332,15 @@ function persistSoon() {
   persistWait = window.setTimeout(() => persist(), 280);
 }
 
+function phoneLayout() {
+  return document.documentElement.classList.contains("phone") || document.body.classList.contains("android");
+}
+
+function revealShell(next) {
+  const wait = phoneLayout() ? 0 : Math.max(0, 1100 - (Date.now() - bootAt));
+  window.setTimeout(next, wait);
+}
+
 function showApp() {
   els.boot.hidden = true;
   els.authWrap.hidden = true;
@@ -425,10 +436,23 @@ function setView(view) {
   els.settings.hidden = view !== "settings";
   $("nav-chats").classList.toggle("active", view !== "settings");
   $("nav-settings").classList.toggle("active", view === "settings");
+  const peopleToggle = $("people-toggle");
   if (view === "thread" && state.activeKind === "group") {
-    showPeople(true);
+    if (phoneLayout()) {
+      showPeople(false);
+      if (peopleToggle) {
+        peopleToggle.hidden = false;
+        peopleToggle.textContent = "⌄";
+      }
+    } else {
+      showPeople(true);
+      if (peopleToggle) peopleToggle.hidden = true;
+    }
     paintPeople();
-  } else showPeople(false);
+  } else {
+    if (peopleToggle) peopleToggle.hidden = true;
+    showPeople(false);
+  }
   if (view === "settings") primeDevices(false).catch(() => {});
 }
 
@@ -536,7 +560,7 @@ function renderChats() {
   const rows = [];
   (state.chats || []).forEach((chat) => rows.push({ ...chat, kind: chat.kind || "dm" }));
   (state.groups || []).forEach((group) => rows.push({ ...group, kind: "group" }));
-  rows.sort((a, b) => (b.at || 0) - (a.at || 0));
+  rows.sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
   rows.forEach((chat) => {
     const isGroup = chat.kind === "group";
     const key = isGroup ? `g:${chat.id}` : (chat.name || "");
@@ -1156,17 +1180,47 @@ function setStatus(text) {
   els.status.textContent = text || "";
 }
 
+function paintDirectCall() {
+  const box = $("live-people");
+  if (!box) return;
+  const names = [];
+  if (state.remoteLabel) names.push(state.remoteLabel);
+  if (state.me && state.me.name && !names.some((name) => sameName(name, state.me.name))) names.push(state.me.name);
+  box.hidden = false;
+  box.replaceChildren();
+  names.forEach((name) => {
+    const tile = document.createElement("div");
+    tile.className = "live-tile";
+    tile.dataset.name = name;
+    const pic = document.createElement("span");
+    pic.className = "tile-pic";
+    const photo = document.createElement("img");
+    photo.className = "row-avatar";
+    photo.alt = "";
+    photo.hidden = true;
+    const letter = document.createElement("span");
+    letter.className = "tile-letter";
+    letter.textContent = (name || "?").slice(0, 1).toUpperCase();
+    pic.append(photo, letter);
+    bindAvatar(photo, letter, name);
+    const label = document.createElement("small");
+    label.textContent = name;
+    tile.append(pic, label);
+    box.append(tile);
+  });
+}
+
 function showLiveUI() {
   els.live.hidden = false;
   els.call.disabled = true;
   const people = $("live-people");
+  if (people) people.hidden = false;
   if (state.groupCall) {
-    if (people) people.hidden = false;
-    setStatus(`Chiamata di gruppo · ${state.groupCall.name || "Gruppo"}`);
+    setStatus(state.groupCall.name || "Gruppo");
     paintLivePeople();
   } else {
-    if (people) people.hidden = true;
-    setStatus(`In chiamata con ${state.remoteLabel}`);
+    setStatus(state.remoteLabel || "In chiamata");
+    paintDirectCall();
   }
   updateToggles();
 }
@@ -1886,15 +1940,38 @@ function avatarSrc(name) {
   return `/api/avatar/friend?name=${encodeURIComponent(name)}&t=${tick}`;
 }
 
+const avatarUrls = new Map();
+
 function bindAvatar(img, letter, name) {
   if (!img || !name) return;
+  const ticket = String(state.avatarTick || 1);
   img.dataset.avatar = name;
   img.alt = "";
   img.hidden = true;
   if (letter) letter.hidden = false;
-  img.onload = () => { img.hidden = false; if (letter) letter.hidden = true; };
-  img.onerror = () => { img.hidden = true; if (letter) letter.hidden = false; };
-  img.src = avatarSrc(name);
+  const key = name.toLocaleLowerCase("it") + ":" + ticket;
+  const show = (url) => {
+    if (img.dataset.avatar !== name || String(state.avatarTick || 1) !== ticket) return;
+    img.onload = () => { img.hidden = false; if (letter) letter.hidden = true; };
+    img.onerror = () => { img.hidden = true; if (letter) letter.hidden = false; };
+    img.src = url;
+  };
+  const cached = avatarUrls.get(key);
+  if (cached) { show(cached); return; }
+  fetch(avatarSrc(name)).then((res) => {
+    if (!res.ok) throw new Error("missing");
+    return res.blob();
+  }).then((blob) => {
+    if (!blob || !blob.size) throw new Error("empty");
+    const url = URL.createObjectURL(blob);
+    avatarUrls.set(key, url);
+    show(url);
+  }).catch(() => {
+    if (img.dataset.avatar === name) {
+      img.hidden = true;
+      if (letter) letter.hidden = false;
+    }
+  });
 }
 
 function bumpAvatars() {
@@ -1952,7 +2029,8 @@ function rememberGroupPeer(peerId, extra) {
 function paintLivePeople() {
   const box = $("live-people");
   if (!box || !state.groupCall) return;
-  const names = (state.groupCall.members || []).filter((name) => !sameName(name, state.me && state.me.name));
+  const names = (state.groupCall.members || []).slice();
+  if (state.me && !names.some((name) => sameName(name, state.me.name))) names.unshift(state.me.name);
   box.hidden = false;
   const seen = new Set();
   [...box.children].forEach((node) => {
@@ -2488,7 +2566,7 @@ async function syncNow() {
   if (data && data.ok) {
     if (!Array.isArray(state.chats)) state.chats = [];
     const previousChats = state.chats;
-    const previous = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last]));
+    const previous = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last, chat.at]));
     state.chats = Array.isArray(data.chats) ? data.chats : state.chats;
     if (state.activeKind !== "group") {
       if (data.reload && els.messages) {
@@ -2504,7 +2582,7 @@ async function syncNow() {
       if (data.rev) state.rev = data.rev;
     }
     noteRows(previousChats, state.chats, "dm");
-    const next = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last]));
+    const next = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last, chat.at]));
     if (previous !== next) renderChats();
   }
   if (groups && groups.ok) {
@@ -2542,17 +2620,17 @@ async function checkUpdate() {
   const data = await api("/api/update");
   const local = Number(data.local);
   const shown = Number.isFinite(local) ? local : 0;
-  if (els.version) els.version.textContent = `Versione ${shown}`;
+  if (els.version) els.version.textContent = RELEASE_NAME;
   let pending = !!(data && data.update);
   if (pending && document.body.classList.contains("android") && window.SolaxNative && window.SolaxNative.load) {
     const skipped = Number(window.SolaxNative.load("skip-aver") || 0) || 0;
     if (skipped >= Number(data.remote || 0)) pending = false;
   }
-  if ($("update-title") && data.remote && pending) $("update-title").textContent = `Versione ${data.remote}`;
+  if ($("update-title") && pending) $("update-title").textContent = RELEASE_NAME;
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
-      ? `C’è la versione ${data.remote}. Premi Installa ora e conferma l’installazione sul telefono.`
-      : `La ${shown} lascia il posto alla ${data.remote}. Premi Installa ora: SolaxRD si chiude e si riapre nuovo.`;
+      ? "C’è 1.0.0 release. Premi Installa ora e conferma l’installazione sul telefono."
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con 1.0.0 release.";
   }
   const ready = pending;
   if (!ready) {
@@ -2880,7 +2958,7 @@ async function loadAvatar() {
 
 async function saveAvatar(file) {
   const image = await createImageBitmap(file);
-  const size = 160;
+  const size = 48;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -2889,7 +2967,12 @@ async function saveAvatar(file) {
   const width = image.width * scale;
   const height = image.height * scale;
   ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  let blob = null;
+  for (const quality of [0.62, 0.48, 0.34]) {
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size <= 1400) break;
+  }
+  if (!blob || blob.size > 1600) { els.listError.textContent = "Foto non salvata."; return; }
   const res = await fetch("/api/avatar", { method: "POST", body: blob });
   const data = await res.json();
   if (!data.ok) { els.listError.textContent = data.error || "Foto non salvata."; return; }
@@ -3255,6 +3338,13 @@ async function leaveOrDeleteGroup(kind) {
 if ($("leave-group")) $("leave-group").addEventListener("click", () => leaveOrDeleteGroup("leave"));
 if ($("delete-group")) $("delete-group").addEventListener("click", () => leaveOrDeleteGroup("delete"));
 $("me-btn").addEventListener("click", () => setView("settings"));
+const peopleToggle = $("people-toggle");
+if (peopleToggle) peopleToggle.addEventListener("click", () => {
+  const pane = $("people");
+  const open = !!(pane && pane.hidden);
+  showPeople(open);
+  peopleToggle.textContent = open ? "⌃" : "⌄";
+});
 els.openForm.addEventListener("submit", (event) => { event.preventDefault(); openChat(els.openName.value); });
 els.composer.addEventListener("submit", (event) => { event.preventDefault(); sendMessage(els.composerText.value); });
 els.composerText.addEventListener("input", () => { els.composerCount.textContent = `${els.composerText.value.length}/80`; });
@@ -3345,14 +3435,18 @@ async function boot() {
     state.settings = takeSettings(data.settings);
     applyLocal();
     setTheme(state.settings.theme || "dark");
-    if (data && data.session) await enterApp({ ...data.session, settings: data.settings });
-    else {
-      showAuth();
-      if (els.username) els.username.focus();
-    }
+    revealShell(async () => {
+      if (data && data.session) await enterApp({ ...data.session, settings: data.settings });
+      else {
+        showAuth();
+        if (els.username) els.username.focus();
+      }
+    });
   } catch (e) {
-    showAuth();
-    if (els.authError) els.authError.textContent = "SolaxRD non risponde.";
+    revealShell(() => {
+      showAuth();
+      if (els.authError) els.authError.textContent = "SolaxRD non risponde.";
+    });
   }
 }
 

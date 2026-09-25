@@ -607,9 +607,10 @@
         rev = liveRev || cached.rev;
       }
     } catch (e) { /* keep cache */ }
-    item.seq = Math.max(Number(item.seq || 0), head);
+    const previousSeq = Number(item.seq || 0) || 0;
+    item.seq = Math.max(previousSeq, head);
     item.unread = 0;
-    item.at = now();
+    if (head > previousSeq) item.at = now();
     if (messages.length) item.last = messages[messages.length - 1].filename || messages[messages.length - 1].text || item.last || "";
     saveDb("chats", data);
     return { ok: true, name: display, messages, rev, chats: publicChats(data) };
@@ -672,7 +673,7 @@
         const head = loaded[1];
         if (messages.length) {
           item.last = messages[messages.length - 1].filename || messages[messages.length - 1].text || item.last || "";
-          item.at = now();
+          if (head > (Number(item.seq || 0) || 0)) item.at = now();
           const cached = cacheRead(id);
           const merged = mergeMessages(reload ? [] : cached.messages, messages);
           cacheWrite(id, merged, head, rev);
@@ -824,12 +825,14 @@
     item.name = remote.name;
     item.owner = remote.owner;
     item.members = remote.members;
-    if (extra.last) item.last = extra.last;
+    if (extra.last) {
+      item.last = extra.last;
+      item.at = stamp;
+    }
     if (extra.seq) {
       item.seq = Math.max(Number(item.seq || 0), extra.seq);
       item.unread = 0;
     }
-    item.at = stamp;
     return item;
   }
 
@@ -1151,13 +1154,13 @@
     for (const item of (Array.isArray(names) ? names : []).slice(0, 20)) {
       const [display] = parseName(item);
       if (!display || normalize(display) === normalize(me.name)) continue;
-      const key = publicAvatarKey(display);
-      const raw = await kvGet(key);
+      const packed = await readPublicAvatar(display);
+      const raw = packed.raw;
       if (!raw || raw === AVATAR_REMOVED) {
         N.deleteFile("a-" + normalize(display));
         continue;
       }
-      let jpeg = "";
+      let jpeg = packed.jpeg;
       if (raw.startsWith("w")) {
         const body = raw.slice(1);
         const dot = body.indexOf(".");
@@ -1175,28 +1178,49 @@
     return { ok: true, n: got };
   }
 
+  const AVATAR_PART = 120;
+  const AVATAR_PARTS = 16;
+
+  function avatarPartKey(name, index) {
+    return publicAvatarKey(name) + "z" + index;
+  }
+
+  async function writePublicAvatar(name, bytes) {
+    const token = urlB64(bytes);
+    const count = Math.ceil(token.length / AVATAR_PART);
+    if (!count || count > AVATAR_PARTS) return false;
+    for (let i = 0; i < count; i += 1) {
+      if (!await kvSet(avatarPartKey(name, i), token.slice(i * AVATAR_PART, (i + 1) * AVATAR_PART))) return false;
+    }
+    for (let i = count; i < AVATAR_PARTS; i += 1) await kvSet(avatarPartKey(name, i), "0");
+    return kvSet(publicAvatarKey(name), "c" + count);
+  }
+
+  async function readPublicAvatar(name) {
+    const raw = await kvGet(publicAvatarKey(name)) || "";
+    if (!raw || raw === AVATAR_REMOVED || raw.charAt(0) !== "c") return { raw, jpeg: "" };
+    const count = Number(raw.slice(1)) || 0;
+    if (count < 1 || count > AVATAR_PARTS) return { raw, jpeg: "" };
+    let token = "";
+    for (let i = 0; i < count; i += 1) token += await kvGet(avatarPartKey(name, i)) || "";
+    try {
+      const bytes = urlB64Decode(token);
+      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { raw, jpeg: b64FromBytes(bytes) };
+    } catch (e) { /* skip */ }
+    return { raw, jpeg: "" };
+  }
+
   async function publishAvatar(bytes) {
     const me = session();
     if (!me) return { ok: false, error: "Non sei dentro." };
-    const key = publicAvatarKey(me.name);
-    const oldRaw = await kvGet(key) || "";
     if (!bytes || !bytes.length) {
-      if (oldRaw.startsWith("w")) N.deleteHookMessage(oldRaw.slice(1).split(".")[0]);
-      await kvSet(key, AVATAR_REMOVED);
+      await kvSet(publicAvatarKey(me.name), AVATAR_REMOVED);
+      for (let i = 0; i < AVATAR_PARTS; i += 1) await kvSet(avatarPartKey(me.name, i), "0");
       N.deleteFile("avatar.jpg");
       return { ok: true, removed: true };
     }
-    const b64 = b64FromBytes(bytes);
-    const digest = N.sha256bytes(b64).slice(0, 16);
-    if (oldRaw.startsWith("w") && oldRaw.endsWith("." + digest)) return { ok: true };
-    const messageId = N.uploadPhoto(me.name, b64);
-    if (!messageId) return { ok: false, error: "Foto non pubblicata. Riprova." };
-    if (oldRaw.startsWith("w")) {
-      const oldId = oldRaw.slice(1).split(".")[0];
-      if (oldId && oldId !== messageId) N.deleteHookMessage(oldId);
-    }
-    await kvSet(key, "w" + messageId + "." + digest);
-    N.writeFile("avatar.jpg", b64);
+    if (bytes.length > 1600 || !await writePublicAvatar(me.name, bytes)) return { ok: false, error: "Foto non pubblicata. Riprova." };
+    N.writeFile("avatar.jpg", b64FromBytes(bytes));
     return { ok: true };
   }
 
