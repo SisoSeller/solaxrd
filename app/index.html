@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="SolaxRD">
+  <meta name="theme-color" content="#0c0c0e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta http-equiv="Permissions-Policy" content="microphone=*, camera=*, display-capture=*, speaker-selection=*">
+  <title>SolaxRD</title>
+  <link rel="icon" href="favicon.png">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app-mobile.css">
+  <link rel="stylesheet" href="web.css">
+</head>
+<body class="theme-dark">
+  <header class="titlebar">
+    <div class="titlebar-drag pywebview-drag-region" id="titlebar-drag">SolaxRD</div>
+    <button type="button" class="update-chip" id="update-chip" hidden>Installa ora</button>
+    <div class="traffic" role="group" aria-label="Finestra">
+      <button type="button" class="tl tl-close" id="win-close" title="Chiudi" aria-label="Chiudi"></button>
+      <button type="button" class="tl tl-min" id="win-min" title="Riduci a icona" aria-label="Riduci a icona"></button>
+      <button type="button" class="tl tl-max" id="win-max" title="Ingrandisci" aria-label="Ingrandisci"></button>
+    </div>
+  </header>
+  <div id="boot" class="center-screen">Apro SolaxRD…</div>
+
+  <div id="auth-wrap" class="center-screen" hidden>
+    <section id="auth">
+      <div class="brand"><img class="mark" src="favicon.png" alt=""> SolaxRD</div>
+      <div class="theme-picks" role="group" aria-label="Colore">
+        <button type="button" id="theme-dark" data-theme="dark" title="Nero">Nero</button>
+        <button type="button" id="theme-light" data-theme="light" title="Bianco">Bianco</button>
+        <button type="button" data-theme="purple" title="Viola">Viola</button>
+        <button type="button" data-theme="blue" title="Blu">Blu</button>
+        <button type="button" data-theme="green" title="Verde">Verde</button>
+        <button type="button" data-theme="rose" title="Rosa">Rosa</button>
+      </div>
+      <h1>Entra</h1>
+      <p class="lead">Nome e password. Ogni nome è unico. La password resta segreta.</p>
+      <p class="lead" id="web-hint">Su iPhone, in Safari: Condividi, poi Aggiungi a Home.</p>
+      <form id="auth-form">
+        <label class="field">Nome
+          <input id="username" name="username" autocomplete="username" maxlength="24" required>
+        </label>
+        <label class="field">Password
+          <input id="password" name="password" type="password" autocomplete="current-password" maxlength="64" required>
+        </label>
+        <p id="auth-error" class="error" role="alert"></p>
+        <div class="actions">
+          <button class="primary" id="login" type="submit">Entra</button>
+          <button class="ghost" id="register" type="button">Crea account</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div id="shell" class="shell" hidden>
+    <aside class="rail">
+      <img class="mark big" src="favicon.png" alt="">
+      <button type="button" class="rail-btn active" id="nav-chats" aria-label="Chat" title="Chat">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v8.2a2 2 0 0 1-2 2H9.2L5 20.2V6.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="rail-spacer"></div>
+      <button type="button" class="rail-btn" id="nav-group" aria-label="Nuovo gruppo" title="Nuovo gruppo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 10.2a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Zm7.6 0a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8ZM4.4 18.2c.3-2.6 2.4-4.4 5.2-4.4 2.8 0 4.9 1.8 5.2 4.4M13.8 13.8c2.4.2 4.4 1.8 4.7 4.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button type="button" class="rail-btn" id="nav-settings" aria-label="Opzioni" title="Opzioni">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96c-.5-.4-1.04-.72-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.5.42l-.36 2.54c-.59.22-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.8 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.92 14.16a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.4.31.64.22l2.39-.96c.5.4 1.04.72 1.63.94l.36 2.54c.05.24.26.42.5.42h3.8c.24 0 .45-.18.5-.42l.36-2.54c.59-.22 1.13-.54 1.63-.94l2.39.96c.24.09.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2Z"/></svg>
+      </button>
+      <button type="button" class="me" id="me-btn" aria-label="Account">
+        <img id="me-photo" alt="" hidden>
+        <span id="me-letter">?</span>
+        <span id="me-status" class="dot"></span>
+      </button>
+    </aside>
+
+    <aside class="list" id="list-pane">
+      <header class="list-head">
+        <h2>Messaggi</h2>
+        <p id="net">Connessione…</p>
+      </header>
+      <form id="open-form" class="open-form">
+        <input id="open-name" maxlength="24" placeholder="Nome di una persona" autocomplete="off">
+        <button class="primary" type="submit">Apri</button>
+      </form>
+      <p id="list-error" class="error" role="alert"></p>
+      <div id="chat-list" class="chat-list"></div>
+    </aside>
+
+    <main class="stage">
+      <section id="welcome" class="welcome" hidden></section>
+
+      <section id="thread" class="thread" hidden>
+        <header class="thread-head">
+        <div class="thread-person">
+          <span class="who-pic">
+            <img id="thread-photo" class="row-avatar" alt="" hidden>
+            <span id="thread-letter" class="row-letter">?</span>
+            <span id="thread-online" class="dot offline"></span>
+          </span>
+          <div class="thread-meta">
+            <h2 id="thread-name">Chat</h2>
+            <p id="thread-sub">Messaggi</p>
+          </div>
+        </div>
+          <button class="primary" id="call" type="button">Chiama</button>
+        </header>
+        <div id="messages" class="messages"></div>
+        <div id="reply-bar" class="reply-bar" hidden></div>
+        <form id="composer" class="composer">
+          <button class="ghost icon" id="pick-file" type="button" aria-label="Allega file">+</button>
+          <input id="file-input" type="file" hidden>
+          <input id="composer-text" maxlength="80" placeholder="Scrivi un messaggio" autocomplete="off">
+          <span id="composer-count">0/80</span>
+          <button class="primary" type="submit">Invia</button>
+        </form>
+      </section>
+
+      <div id="live" class="live" hidden>
+        <div class="stage-video">
+          <div id="live-people" class="live-people" hidden></div>
+          <video id="remote-video" autoplay playsinline hidden></video>
+          <video id="local-video" autoplay playsinline muted hidden></video>
+        </div>
+        <div class="live-actions">
+          <span id="status" aria-live="polite">In chiamata</span>
+          <button class="ghost" id="mute" type="button">Muto</button>
+          <button class="ghost" id="camera" type="button">Camera</button>
+          <button class="ghost" id="screen" type="button">Condividi</button>
+          <button class="danger" id="hangup" type="button">Chiudi</button>
+        </div>
+      </div>
+    </main>
+    <aside id="people" class="people" hidden>
+      <header class="people-head">
+        <h2>Nel gruppo</h2>
+        <p id="people-count">0/5</p>
+      </header>
+      <div id="people-list" class="people-list"></div>
+      <form id="add-member" class="open-form" hidden>
+        <input id="add-member-name" maxlength="24" placeholder="Nome da aggiungere" autocomplete="off">
+        <button class="primary" type="submit">Aggiungi</button>
+      </form>
+      <p id="people-error" class="error" role="alert"></p>
+      <button type="button" class="danger" id="delete-group" hidden>Elimina gruppo</button>
+      <button type="button" class="ghost" id="leave-group">Esci dal gruppo</button>
+    </aside>
+    <footer class="dock">
+      <div class="dock-user">
+        <span class="avatar" id="dock-avatar">
+          <img id="dock-photo" alt="" hidden>
+          <span id="dock-letter">?</span>
+          <span id="dock-dot" class="dot"></span>
+        </span>
+        <span>
+          <strong id="dock-name">SolaxRD</strong>
+          <small id="dock-status">Online</small>
+        </span>
+      </div>
+      <div class="dock-actions">
+        <button type="button" id="dock-mute" aria-pressed="false">Microfono</button>
+        <button type="button" id="dock-deaf" aria-pressed="false">Audio</button>
+      </div>
+    </footer>
+    <section id="settings" class="settings" hidden>
+      <nav class="set-nav" aria-label="Impostazioni">
+        <div class="set-brand"><img class="mark" src="favicon.png" alt=""> Opzioni</div>
+        <button type="button" data-panel="account" class="active">Account</button>
+        <button type="button" data-panel="look">Aspetto</button>
+        <button type="button" data-panel="voice">Voce e video</button>
+        <button type="button" data-panel="chat">Chat</button>
+        <button type="button" data-panel="system">Sistema</button>
+        <p id="settings-saved" class="lead" hidden>Salvato</p>
+        <button type="button" class="ghost" id="settings-close">Chiudi</button>
+      </nav>
+      <div class="set-body">
+        <div class="panel" data-panel="account">
+          <h2>Account</h2>
+          <div class="profile-row">
+            <button type="button" id="avatar-pick" class="avatar-pick" aria-label="Cambia foto profilo">
+              <img id="avatar-img" alt="" hidden>
+              <span id="avatar-letter">?</span>
+            </button>
+            <div>
+              <p class="lead" id="set-name-line">Nome: <strong id="set-name"></strong></p>
+              <p class="lead">Ogni persona ha un nome diverso.</p>
+              <button type="button" class="ghost" id="avatar-clear">Togli foto</button>
+            </div>
+          </div>
+          <input id="avatar-file" type="file" accept="image/*" hidden>
+          <label class="field">Nuovo nome
+            <input id="rename-name" maxlength="24" placeholder="Cambia il tuo nome" autocomplete="username">
+          </label>
+          <label class="field">Password per confermare
+            <input id="rename-pass" type="password" maxlength="64" placeholder="Password" autocomplete="current-password">
+          </label>
+          <p id="rename-error" class="error" role="alert"></p>
+          <button type="button" class="primary" id="rename-save">Salva nome</button>
+          <label class="field">Stato
+            <select id="set-status">
+              <option value="online">Online</option>
+              <option value="away">Assente</option>
+              <option value="dnd">Non disturbare</option>
+            </select>
+          </label>
+          <label class="field">Stato personalizzato
+            <input id="set-custom" maxlength="40" placeholder="Cosa stai facendo">
+          </label>
+          <label class="field">Blocca un nome
+            <span class="row">
+              <input id="block-name" maxlength="24" placeholder="Nome">
+              <button type="button" class="ghost" id="block-add">Blocca</button>
+            </span>
+          </label>
+          <div id="block-list" class="chips"></div>
+          <button type="button" class="ghost" id="logout">Esci</button>
+        </div>
+
+        <div class="panel" data-panel="look" hidden>
+          <h2>Aspetto</h2>
+          <p class="lead">Colore del menu e di SolaxRD</p>
+          <div class="theme-picks" role="group" aria-label="Colore">
+            <button type="button" class="swatch" data-theme="dark">Nero</button>
+            <button type="button" class="swatch" data-theme="light">Bianco</button>
+            <button type="button" class="swatch" data-theme="purple">Viola</button>
+            <button type="button" class="swatch" data-theme="blue">Blu</button>
+            <button type="button" class="swatch" data-theme="green">Verde</button>
+            <button type="button" class="swatch" data-theme="rose">Rosa</button>
+          </div>
+          <label class="field" hidden>Tema
+            <select id="set-theme">
+              <option value="dark">Nero</option>
+              <option value="light">Bianco</option>
+              <option value="purple">Viola</option>
+              <option value="blue">Blu</option>
+              <option value="green">Verde</option>
+              <option value="rose">Rosa</option>
+            </select>
+          </label>
+          <label class="field">Grandezza testo
+            <select id="set-font">
+              <option value="13">Piccolo</option>
+              <option value="15">Normale</option>
+              <option value="18">Grande</option>
+            </select>
+          </label>
+          <label class="field">Zoom finestra
+            <select id="set-zoom">
+              <option value="90">90%</option>
+              <option value="100">100%</option>
+              <option value="110">110%</option>
+              <option value="120">120%</option>
+            </select>
+          </label>
+          <button type="button" class="switch" id="set-compact">Elenco compatto</button>
+          <button type="button" class="switch" id="set-motion">Meno animazioni</button>
+          <button type="button" class="switch" id="set-time">Orari nei messaggi</button>
+          <button type="button" class="switch" id="set-clock">Orario 24 ore</button>
+        </div>
+
+        <div class="panel" data-panel="voice" hidden>
+          <h2>Voce e video</h2>
+          <label class="field">Microfono <select id="mic"></select></label>
+          <label class="field" id="speaker-field">Audio in uscita <select id="speaker"></select></label>
+          <label class="field">Camera <select id="cam"></select></label>
+          <p class="lead" id="media-hint"></p>
+          <label class="field">Volume microfono <input id="set-mic-vol" type="range" min="0" max="100" step="5"></label>
+          <label class="field">Volume in arrivo <input id="set-out-vol" type="range" min="0" max="100" step="5"></label>
+          <button type="button" class="switch" id="set-echo">Togli l’eco</button>
+          <button type="button" class="switch" id="set-noise">Riduci il rumore</button>
+          <button type="button" class="switch" id="set-gain">Livella il volume</button>
+          <button type="button" class="switch" id="set-ptt">Premi per parlare (spazio)</button>
+          <label class="field">FPS schermo
+            <input id="set-screen-fps" type="number" min="30" max="160" step="1">
+          </label>
+          <label class="field">Risoluzione schermo
+            <input id="set-screen-res" type="number" min="360" max="1440" step="1">
+          </label>
+          <button type="button" class="switch" id="set-preview">Mostra la tua camera</button>
+          <button type="button" class="switch" id="set-confirm">Chiedi prima di chiamare</button>
+          <button type="button" class="switch" id="set-call-sound">Suono chiamata</button>
+        </div>
+
+        <div class="panel" data-panel="chat" hidden>
+          <h2>Chat</h2>
+          <button type="button" class="switch" id="set-enter">Invio manda il messaggio</button>
+          <button type="button" class="switch" id="set-msg-sound">Suono messaggio</button>
+          <button type="button" class="switch" id="set-badge">Pallino non letti</button>
+          <label class="field">Suoni
+            <select id="set-notify">
+              <option value="all">Tutti</option>
+              <option value="none">Nessuno</option>
+            </select>
+          </label>
+          <button type="button" class="switch" id="set-last">Riapri l’ultima chat</button>
+          <p class="lead">I messaggi di testo arrivano fino a 80 caratteri. Foto, GIF e file arrivano fino a 2 GB quando l’amico ha SolaxRD aperto.</p>
+        </div>
+
+        <div class="panel" data-panel="system" hidden>
+          <h2>Sistema</h2>
+          <button type="button" class="switch" id="set-top">Sempre in primo piano</button>
+          <button type="button" class="switch" id="set-startup">Apri all’avvio di Windows</button>
+          <p id="version-label" class="lead">Versione</p>
+          <div class="actions">
+            <button type="button" class="primary" id="check-update">Controlla aggiornamento</button>
+            <button type="button" class="ghost" id="clear-chats">Svuota elenco chat</button>
+            <button type="button" class="danger" id="quit-app">Chiudi del tutto</button>
+          </div>
+          <p id="system-note" class="lead"></p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="update-banner" class="update" hidden>
+    <div class="update-card" role="dialog" aria-modal="true" aria-labelledby="update-title">
+      <img class="update-mark" src="favicon.png" alt="">
+      <p class="eyebrow">SolaxRD</p>
+      <h2 id="update-title">Nuova versione</h2>
+      <p id="update-copy" class="lead">C’è un aggiornamento pronto. Premi Installa: l’app si chiude e si riapre nuova.</p>
+      <div id="update-bar" class="update-bar" hidden><span></span></div>
+      <div class="actions">
+        <button class="primary" id="install-update" type="button">Installa ora</button>
+        <button class="ghost" id="update-later" type="button">Più tardi</button>
+      </div>
+    </div>
+  </div>
+  <div id="group-modal" class="incoming" hidden>
+    <div class="incoming-card" role="dialog" aria-modal="true" aria-labelledby="group-title">
+      <p class="eyebrow">Gruppo</p>
+      <h2 id="group-title">Nuovo gruppo</h2>
+      <p class="lead">Massimo 5 persone, te compreso.</p>
+      <label class="field">Nome del gruppo
+        <input id="group-name" maxlength="24" placeholder="Nome" autocomplete="off">
+      </label>
+      <label class="field">Aggiungi amici
+        <span class="row">
+          <input id="group-person" maxlength="24" placeholder="Nome" autocomplete="off">
+          <button type="button" class="ghost" id="group-add-person">Aggiungi</button>
+        </span>
+      </label>
+      <div id="group-chips" class="chips"></div>
+      <p id="group-error" class="error" role="alert"></p>
+      <div class="actions">
+        <button class="primary" id="group-create" type="button">Crea</button>
+        <button class="ghost" id="group-cancel" type="button">Annulla</button>
+      </div>
+    </div>
+  </div>
+  <div id="incoming" class="incoming" hidden>
+    <div class="incoming-card" role="dialog" aria-modal="true" aria-labelledby="incoming-title">
+      <p class="eyebrow">Chiamata</p>
+      <h2 id="incoming-title">Ti stanno chiamando</h2>
+      <div class="actions">
+        <button class="primary" id="accept" type="button">Accetta</button>
+        <button class="ghost" id="reject" type="button">Rifiuta</button>
+      </div>
+    </div>
+  </div>
+  <div id="lightbox" class="lightbox" hidden>
+    <div class="lightbox-card" role="dialog" aria-modal="true">
+      <img id="lightbox-img" alt="">
+      <p id="lightbox-name" class="lead"></p>
+      <div class="actions">
+        <button class="primary" id="lightbox-save" type="button">Scarica</button>
+        <button class="ghost" id="lightbox-close" type="button">Chiudi</button>
+      </div>
+    </div>
+  </div>
+  <audio id="remote-audio" autoplay></audio>
+  <div id="call-audios" hidden></div>
+  <script src="vendor/peerjs.min.js"></script>
+  <script src="scrypt.js"></script>
+  <script src="web-native.js"></script>
+  <script src="backend.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
