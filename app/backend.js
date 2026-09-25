@@ -166,24 +166,24 @@
     await kvSet(groupIndexKey(name), unique.length ? urlB64(unique.join("\n")) : "0");
   }
 
-  async function indexAdd(name, gid) {
+    const current = await readIndex(name);
+    await writeIndex(name, current.filter((item) => item !== gid));
     const current = await readIndex(name);
     if (!current.includes(gid)) current.push(gid);
     await writeIndex(name, current);
-  }
-
-  async function indexRemove(name, gid) {
-    const current = await readIndex(name);
-    await writeIndex(name, current.filter((item) => item !== gid));
-  }
-
-  async function indexTouch(names, gid, drop) {
     for (const name of (names || [])) {
       try {
-        if (drop) await indexRemove(name, gid);
-        else await indexAdd(name, gid);
+        if (drop) indexRemove(name, gid);
+        else indexAdd(name, gid);
       } catch (e) { /* skip */ }
     }
+  function indexTouch(names, gid, drop) {
+    (names || []).forEach((name) => {
+      try {
+        if (drop) indexRemove(name, gid);
+        else indexAdd(name, gid);
+      } catch (e) { /* skip */ }
+    });
   }
 
   function cid(a, b) {
@@ -545,13 +545,6 @@
     const wanted = [];
     const seen = new Set();
     (Array.isArray(names) ? names : []).forEach((item) => {
-      const [display, err] = parseName(item);
-      if (!display || err || seen.has(normalize(display))) return;
-      seen.add(normalize(display));
-      wanted.push(display);
-    });
-    const online = {};
-    const stampNow = now();
     for (const display of wanted.slice(0, 16)) {
       const raw = await kvGet(presenceKey(display));
       if (!raw) continue;
@@ -564,6 +557,13 @@
         online[display] = { on: true, s: "oad".includes(letter) ? letter : "o" };
       } catch (e) { /* skip */ }
     }
+        const idx = text.indexOf(":");
+        const stamp = Number(text.slice(0, idx));
+        const letter = text.slice(idx + 1);
+        if (stampNow - stamp > 55) return;
+        online[display] = { on: true, s: "oad".includes(letter) ? letter : "o" };
+      } catch (e) { /* skip */ }
+    });
     return { ok: true, online };
   }
 
@@ -786,17 +786,17 @@
     return await kvSet(rosterKey(gid), packRoster(title, owner, members));
   }
 
-  async function pokeGroup(recipient, gid) {
-    const base = groupInboxKey(recipient);
-    const counter = (Number(await kvGet(base + "c") || 0) || 0) + 1;
+    for (const member of (members || [])) {
+      try { pokeGroup(member, gid); } catch (e) { /* skip */ }
+    }
     await kvSet(base + String(counter % 5), gid);
     await kvSet(base + "c", String(counter));
   }
 
-  async function pokeAll(gid, members, me) {
-    for (const member of (members || [])) {
-      try { await pokeGroup(member, gid); } catch (e) { /* skip */ }
-    }
+  function pokeAll(gid, members, me) {
+    (members || []).forEach((member) => {
+      try { pokeGroup(member, gid); } catch (e) { /* skip */ }
+    });
   }
 
   function publicGroups(data) {
@@ -864,16 +864,6 @@
         continue;
       }
       data.left = (data.left || []).filter((item) => item !== token);
-      rememberGroup(data, remote);
-    }
-    data.inbox = counter;
-  }
-
-  async function syncIndex(me, data) {
-    const left = new Set(data.left || []);
-    const cloud = await readIndex(me);
-    const local = data.items.map((item) => item.id).filter((gid) => /^[0-9a-f]{16}$/.test(gid || ""));
-    const seen = new Set();
     for (const gid of cloud.concat(local)) {
       if (!gid || seen.has(gid)) continue;
       seen.add(gid);
@@ -888,20 +878,30 @@
       data.left = (data.left || []).filter((item) => item !== gid);
       rememberGroup(data, remote);
     }
-    const live = data.items.map((item) => item.id).filter((gid) => /^[0-9a-f]{16}$/.test(gid || ""));
-    const merged = [];
-    live.concat(cloud.filter((gid) => !left.has(gid))).forEach((gid) => {
-      if (gid && !merged.includes(gid) && !left.has(gid)) merged.push(gid);
+      const remote = await fetchGroup(gid);
+      if (!remote) return;
+      if (remote.deleted || !inGroup(me, remote.members)) {
+        dropLocalGroup(data, gid);
+        left.add(gid);
+        return;
+      }
+      data.left = (data.left || []).filter((item) => item !== gid);
+    for (const item of data.items) {
+      const gid = item.id || "";
+      if (!/^[0-9a-f]{16}$/.test(gid) || shared.has(gid) || left.has(gid)) continue;
+      try { indexTouch(item.members || [], gid, false); } catch (e) { continue; }
+      shared.add(gid);
+    }
     });
     const same = merged.length === cloud.length && merged.every((gid) => cloud.includes(gid));
     if (!same) await writeIndex(me, merged);
     const shared = new Set(data.shared || []);
-    for (const item of data.items) {
+    data.items.forEach((item) => {
       const gid = item.id || "";
-      if (!/^[0-9a-f]{16}$/.test(gid) || shared.has(gid) || left.has(gid)) continue;
-      try { await indexTouch(item.members || [], gid, false); } catch (e) { continue; }
+      if (!/^[0-9a-f]{16}$/.test(gid) || shared.has(gid) || left.has(gid)) return;
+      try { indexTouch(item.members || [], gid, false); } catch (e) { return; }
       shared.add(gid);
-    }
+    });
     data.shared = [...shared].slice(-40);
   }
 
@@ -914,16 +914,6 @@
     if (start > head) return [[], head];
     const messages = [];
     for (let seq = start; seq <= head; seq += 1) {
-      const unpacked = unpack(await kvGet("m" + id + String(seq).padStart(4, "0")));
-      if (!unpacked) continue;
-      const row = rowOf(unpacked, sideInGroup(me, members), seq);
-      row.from = nameOfSide(unpacked.s, members);
-      messages.push(row);
-    }
-    return [messages, head];
-  }
-
-  async function previewGroups(data, skipId) {
     for (const item of data.items.slice(0, 8)) {
       if (!item || !item.id || item.id === skipId) continue;
       const head = await headOf(gcid(item.id));
@@ -936,13 +926,23 @@
       item.from = nameOfSide(unpacked.s, item.members || []);
       item.at = now();
     }
+      const head = await headOf(gcid(item.id));
+      const seen = Number(item.seq || 0) || 0;
+      if (head <= seen) return;
+      item.unread = Math.max(0, head - seen);
+      const unpacked = unpack(await kvGet("m" + gcid(item.id) + String(head).padStart(4, "0")));
+      if (!unpacked) return;
+      item.last = unpacked.t || unpacked.fn || item.last || "";
+      item.from = nameOfSide(unpacked.s, item.members || []);
+      item.at = now();
+    });
   }
 
   async function listGroups() {
     const me = session();
     if (!me) return { ok: false, error: "Entra di nuovo." };
     const data = loadDb("groups");
-    try { await syncInvites(me.name, data); await syncIndex(me.name, data); await previewGroups(data); } catch (e) { /* skip */ }
+    try { await syncInvites(me.name, data); syncIndex(me.name, data); previewGroups(data); } catch (e) { /* skip */ }
     saveDb("groups", data);
     return { ok: true, groups: publicGroups(data) };
   }
@@ -959,23 +959,23 @@
       if (fail || seen.has(normalize(display))) return;
       seen.add(normalize(display));
       wanted.push(display);
-    });
-    if (wanted.length + 1 > MAX_MEMBERS) return { ok: false, error: "Massimo 5 persone per gruppo." };
-    const members = [me.name, ...wanted];
-    const gid = N.uuidHex(16);
+    for (const name of wanted) {
+      const rec = await fetchRecord(userKey(name));
+      if (rec && !resolved.some((item) => normalize(item) === normalize(rec.name))) resolved.push(rec.name);
+    }
     const remote = { id: gid, name: parsed[0], owner: me.name, members };
     const data = loadDb("groups");
     rememberGroup(data, remote);
     data.left = (data.left || []).filter((item) => item !== gid);
     saveDb("groups", data);
     const resolved = [me.name];
-    for (const name of wanted) {
+    wanted.forEach((name) => {
       const rec = await fetchRecord(userKey(name));
       if (rec && !resolved.some((item) => normalize(item) === normalize(rec.name))) resolved.push(rec.name);
-    }
+    });
     await writeGroup(gid, parsed[0], me.name, resolved);
-    await indexTouch(resolved, gid, false);
-    await pokeAll(gid, resolved, me.name);
+    indexTouch(resolved, gid, false);
+    pokeAll(gid, resolved, me.name);
     return { ok: true, group: remote, groups: publicGroups(data) };
   }
 
@@ -1015,7 +1015,7 @@
     const item = rememberGroup(data, remote, { seq: head });
     item.unread = 0;
     if (messages.length) item.last = messages[messages.length - 1].filename || messages[messages.length - 1].text || item.last || "";
-    try { await previewGroups(data, gid); } catch (e) { /* skip */ }
+    try { previewGroups(data, gid); } catch (e) { /* skip */ }
     saveDb("groups", data);
     return { ok: true, group: remote, messages, rev, groups: publicGroups(data) };
   }
@@ -1036,7 +1036,7 @@
     const head = await headOf(id) + 1;
     if (!await kvSet("m" + id + String(head).padStart(4, "0"), packed)) return { ok: false, error: "Messaggio non inviato. Riprova." };
     await kvSet("m" + id + "h", String(head));
-    await pokeAll(gid, remote.members, me.name);
+    pokeAll(gid, remote.members, me.name);
     const item = rememberGroup(data, remote, { last: text, seq: head });
     item.unread = 0;
     saveDb("groups", data);
@@ -1060,8 +1060,8 @@
     rememberGroup(data, remote);
     saveDb("groups", data);
     await writeGroup(gid, remote.name, remote.owner, remote.members);
-    await indexAdd(rec.name, gid);
-    await pokeGroup(rec.name, gid);
+    indexAdd(rec.name, gid);
+    pokeGroup(rec.name, gid);
     return { ok: true, group: remote, groups: publicGroups(data) };
   }
 
@@ -1079,11 +1079,11 @@
       if (normalize(owner) === normalize(me.name)) owner = kept[0] || me.name;
       if (kept.length) {
         await writeGroup(gid, live.name, owner, kept);
-        await indexRemove(me.name, gid);
-        await pokeAll(gid, kept, me.name);
+        indexRemove(me.name, gid);
+        pokeAll(gid, kept, me.name);
       } else {
         await kvSet(rosterKey(gid), "!");
-        await indexRemove(me.name, gid);
+        indexRemove(me.name, gid);
       }
     }
     return { ok: true, groups: publicGroups(data) };
@@ -1103,8 +1103,8 @@
     dropLocalGroup(data, gid);
     saveDb("groups", data);
     await kvSet(rosterKey(gid), "!");
-    await indexTouch(members, gid, true);
-    await pokeAll(gid, members, me.name);
+    indexTouch(members, gid, true);
+    pokeAll(gid, members, me.name);
     return { ok: true, groups: publicGroups(data) };
   }
 
@@ -1130,7 +1130,7 @@
       const rev = await bump(id);
       rememberGroup(data, remote, { last: filename, seq: head });
       saveDb("groups", data);
-      await pokeAll(target, remote.members, me.name);
+      pokeAll(target, remote.members, me.name);
       const message = rowOf(payload, payload.s, head);
       message.from = me.name;
       return { ok: true, id: fileId, n: head, rev, message, group: remote, groups: publicGroups(data) };
@@ -1148,26 +1148,16 @@
     await poke(display, me.name);
     const rev = await bump(id);
     item = findChat(data, display);
-    if (!item) data.items.push({ name: display, last: filename, unread: 0, seq: head, at: now() });
-    else { item.last = filename; item.seq = head; item.unread = 0; item.at = now(); }
-    saveDb("chats", data);
-    return { ok: true, id: fileId, n: head, rev, message: rowOf(payload, payload.s, head), chats: publicChats(data) };
-  }
-
-  async function pullAvatars(names) {
-    const me = session();
-    if (!me) return { ok: false, error: "Non sei dentro." };
-    let got = 0;
     for (const item of (Array.isArray(names) ? names : []).slice(0, 20)) {
       const [display] = parseName(item);
       if (!display || normalize(display) === normalize(me.name)) continue;
-      const packed = await readPublicAvatar(display);
-      const raw = packed.raw;
+      const key = publicAvatarKey(display);
+      const raw = await kvGet(key);
       if (!raw || raw === AVATAR_REMOVED) {
         N.deleteFile("a-" + normalize(display));
         continue;
       }
-      let jpeg = packed.jpeg;
+      let jpeg = "";
       if (raw.startsWith("w")) {
         const body = raw.slice(1);
         const dot = body.indexOf(".");
@@ -1182,11 +1172,26 @@
         got += 1;
       }
     }
-    return { ok: true, n: got };
+      }
+      if (raw.startsWith("w")) {
+        const body = raw.slice(1);
+        const dot = body.indexOf(".");
+        const messageId = body.slice(0, dot);
+        const url = N.hookMessageUrl(messageId);
+        if (url) jpeg = N.downloadUrl(url);
+      } else if (raw.startsWith("https://")) {
+        jpeg = N.downloadUrl(raw);
+      }
+      if (jpeg) {
+        N.writeFile("a-" + normalize(display), jpeg);
+        got += 1;
+      }
+    });
+    return { ok: true, n: got, urls };
   }
 
   const AVATAR_PART = 120;
-  const AVATAR_PARTS = 16;
+  const AVATAR_PARTS = 24;
 
   function avatarPartKey(name, index) {
     return publicAvatarKey(name) + "z" + index;
@@ -1200,21 +1205,33 @@
       if (!await kvSet(avatarPartKey(name, i), token.slice(i * AVATAR_PART, (i + 1) * AVATAR_PART))) return false;
     }
     for (let i = count; i < AVATAR_PARTS; i += 1) await kvSet(avatarPartKey(name, i), "0");
-    return kvSet(publicAvatarKey(name), "c" + count);
+    return await kvSet(publicAvatarKey(name), "c" + count);
   }
 
   async function readPublicAvatar(name) {
     const raw = await kvGet(publicAvatarKey(name)) || "";
-    if (!raw || raw === AVATAR_REMOVED || raw.charAt(0) !== "c") return { raw, jpeg: "" };
+    if (!raw || raw === AVATAR_REMOVED) return { raw, jpeg: "", url: "" };
+    const kind = raw.charAt(0);
+    if (kind !== "c" && kind !== "u") return { raw, jpeg: "", url: "" };
     const count = Number(raw.slice(1)) || 0;
-    if (count < 1 || count > AVATAR_PARTS) return { raw, jpeg: "" };
+    if (count < 1 || count > AVATAR_PARTS) return { raw, jpeg: "", url: "" };
     let token = "";
     for (let i = 0; i < count; i += 1) token += await kvGet(avatarPartKey(name, i)) || "";
+    if (kind === "u" && token.startsWith("https://")) return { raw, jpeg: "", url: token };
     try {
       const bytes = urlB64Decode(token);
-      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { raw, jpeg: b64FromBytes(bytes) };
+      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { raw, jpeg: b64FromBytes(bytes), url: "" };
     } catch (e) { /* skip */ }
-    return { raw, jpeg: "" };
+    return { raw, jpeg: "", url: "" };
+  }
+
+  async function writePublicLink(name, url) {
+    const count = Math.ceil(String(url || "").length / AVATAR_PART);
+    if (!count || count > AVATAR_PARTS || !String(url).startsWith("https://")) return false;
+    for (let i = 0; i < count; i += 1) {
+      if (!await kvSet(avatarPartKey(name, i), url.slice(i * AVATAR_PART, (i + 1) * AVATAR_PART))) return false;
+    }
+    return await kvSet(publicAvatarKey(name), "u" + count);
   }
 
   async function publishAvatar(bytes) {
@@ -1226,8 +1243,14 @@
       N.deleteFile("avatar.jpg");
       return { ok: true, removed: true };
     }
-    if (bytes.length > 1600 || !await writePublicAvatar(me.name, bytes)) return { ok: false, error: "Foto non pubblicata. Riprova." };
-    N.writeFile("avatar.jpg", b64FromBytes(bytes));
+    const b64 = b64FromBytes(bytes);
+    const shared = N.uploadChatPhoto ? String(N.uploadChatPhoto(b64) || "") : "";
+    if (shared.startsWith("https://") && await writePublicLink(me.name, shared)) {
+      N.writeFile("avatar.jpg", b64);
+      return { ok: true, url: shared };
+    }
+    if (!await writePublicAvatar(me.name, bytes)) return { ok: false, error: "Foto non pubblicata. Riprova." };
+    N.writeFile("avatar.jpg", b64);
     return { ok: true };
   }
 
@@ -1268,7 +1291,7 @@
       const piece = token.slice(i * PREVIEW_PART, (i + 1) * PREVIEW_PART);
       if (!await kvSet("i" + id + "z" + i, piece)) return false;
     }
-    return kvSet("i" + id, kind + count);
+    return await kvSet("i" + id, kind + count);
   }
 
   async function readPreview(id) {
@@ -1278,13 +1301,9 @@
     const count = Number(raw.slice(1)) || 0;
     if (count < 1 || count > PREVIEW_PARTS) return { url: "", bytes: null };
     let token = "";
-    for (let i = 0; i < count; i += 1) token += await kvGet("i" + id + "z" + i) || "";
-    if (kind === "u" && token.startsWith("https://")) return { url: token, bytes: null };
-    try {
-      const bytes = urlB64Decode(token);
-      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { url: "", bytes };
-    } catch (e) { /* skip */ }
-    return { url: "", bytes: null };
+      else if (path === "/api/update") {
+        payload = { ok: true, current: 1, latest: 1, local: 1, remote: 1, update: false, ready: false };
+      }
   }
 
   window.fetch = async function (input, init) {
@@ -1336,17 +1355,6 @@
           } else if (got.bytes && got.bytes.length) {
             b64 = b64FromBytes(got.bytes);
             N.writeFile("f-" + id, b64);
-          } else if (got.url) {
-            try {
-              const remote = await nativeFetch(got.url);
-              if (remote.ok) {
-                const bytes = new Uint8Array(await remote.arrayBuffer());
-                if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) {
-                  b64 = b64FromBytes(bytes);
-                  N.writeFile("f-" + id, b64);
-                }
-              }
-            } catch (e) { /* preview url still used in UI */ }
           }
         }
         if (!b64) return binResponse(new Uint8Array(), "text/plain", 404);
@@ -1361,36 +1369,23 @@
         const b64 = N.readFile("avatar.jpg");
         if (!b64) return binResponse(new Uint8Array(), "text/plain", 404);
         return binResponse(bytesFromB64(b64), "image/jpeg", 200);
+      else if (path === "/api/groups/sync") {
+        if (!data.id) payload = await listGroups();
+        else {
+          const listed = await listGroups();
+          const opened = await openGroup(data.id);
+          if (!opened.ok) payload = { ok: true, groups: listed.groups || [] };
+          else payload = { ...opened, groups: listed.groups };
+        }
       }
-      if (path === "/api/avatar/friend" && method === "GET") {
-        const [display] = parseName(query.get("name") || "");
-        if (!display) return binResponse(new Uint8Array(), "text/plain", 404);
-        const me = session();
-        if (me && normalize(me.name) === normalize(display)) {
           const mine = N.readFile("avatar.jpg");
           if (mine) return binResponse(bytesFromB64(mine), "image/jpeg", 200);
         }
         const b64 = N.readFile("a-" + normalize(display));
         if (b64) return binResponse(bytesFromB64(b64), "image/jpeg", 200);
-        return binResponse(new Uint8Array(), "text/plain", 404);
+      else if (path === "/api/update/apply") {
+        payload = { ok: true, current: true, exit: false };
       }
-      if (path === "/api/files/upload") {
-        const id = query.get("id") || "";
-        const bytes = await bodyBytes(init);
-        N.appendFile("f-" + id, b64FromBytes(bytes));
-        return jsonResponse({ ok: true, size: N.fileSize("f-" + id) });
-      }
-      if (path === "/api/avatar" && method === "POST") {
-        const bytes = await bodyBytes(init);
-        if (!bytes.length) {
-          N.deleteFile("avatar.jpg");
-          return jsonResponse({ ok: true, removed: true });
-        }
-        N.writeFile("avatar.jpg", b64FromBytes(bytes));
-        return jsonResponse({ ok: true });
-      }
-      if (path === "/api/avatar/publish") {
-        const bytes = await bodyBytes(init);
         return jsonResponse(await publishAvatar(bytes));
       }
       if (path === "/api/avatar/friend" && method === "POST") {
@@ -1408,7 +1403,11 @@
       else if (path === "/api/chats") payload = await listChats();
       else if (path === "/api/groups") payload = await listGroups();
       else if (path === "/api/update") {
-        payload = { ok: true, current: 1, latest: 1, local: 1, remote: 1, update: false, ready: false };
+        const local = Number(N.appVersion() || 0) || 0;
+        const remote = window.SolaxIOS
+          ? (Number(await kvGet("iver") || 0) || 0)
+          : (Number(await kvGet("aver") || 0) || 0);
+        payload = { ok: true, current: local, latest: remote, local, remote, update: remote > local, ready: remote > local };
       }
       else if (path === "/api/presence" && method === "GET") payload = { ok: true, mic: false, deaf: false };
       else if (path === "/api/register") payload = await register(data.username, data.password);
@@ -1465,7 +1464,7 @@
       else if (path === "/api/chats/react") payload = await changeMessage(data.name, data.n, (row) => { row.e = row.e === data.emoji ? "" : data.emoji; return row; }, false);
       else if (path === "/api/chats/pin") payload = await changeMessage(data.name, data.n, (row) => { row.p = row.p ? 0 : 1; return row; }, false);
       else if (path === "/api/files/start") payload = await startFile("chat", data.name, data.filename, data.mime, data.size);
-      else if (path === "/api/avatars/pull") payload = await pullAvatars(data.names);
+      else if (path === "/api/avatars/pull") payload = pullAvatars(data.names);
       else if (path === "/api/presence") payload = { ok: true, mic: !!data.mic, deaf: !!data.deaf };
       else if (path === "/api/chats/clear") {
         saveDb("chats", { items: [], inbox: 0 });
@@ -1473,22 +1472,37 @@
       } else if (path === "/api/groups/create") payload = await createGroup(data.name, data.members);
       else if (path === "/api/groups/open") payload = await openGroup(data.id);
       else if (path === "/api/groups/send") payload = await sendGroup(data.id, data.text);
-      else if (path === "/api/groups/sync") {
-        if (!data.id) payload = await listGroups();
-        else {
-          const listed = await listGroups();
-          const opened = await openGroup(data.id);
-          if (!opened.ok) payload = { ok: true, groups: listed.groups || [] };
-          else payload = { ...opened, groups: listed.groups };
-        }
-      }
+      else if (path === "/api/groups/sync") payload = data.id ? (function () {
+        const listed = await listGroups();
+        const opened = await openGroup(data.id);
+        if (!opened.ok) return { ok: true, groups: listed.groups || [] };
+        return { ...opened, groups: listed.groups };
+      }()) : await listGroups();
       else if (path === "/api/groups/add") payload = await addMember(data.id, data.name);
       else if (path === "/api/groups/leave") payload = await leaveGroup(data.id);
       else if (path === "/api/groups/delete") payload = await deleteGroup(data.id);
       else if (path === "/api/groups/files/start") payload = await startFile("group", data.id, data.filename, data.mime, data.size);
       else if (path === "/api/quit") payload = { ok: true };
       else if (path === "/api/update/apply") {
-        payload = { ok: true, current: true, exit: false };
+        const remote = window.SolaxIOS
+          ? (Number(await kvGet("iver") || 0) || 0)
+          : (Number(await kvGet("aver") || 0) || 0);
+        const local = Number(N.appVersion() || 0) || 0;
+        if (window.SolaxIOS) {
+          if (remote <= local) payload = { ok: true, current: true, exit: false };
+          else payload = { ok: String(N.openDownload() || "") === "1", exit: false };
+        } else if (remote <= local) {
+          payload = { ok: true, current: true, exit: false };
+        } else {
+          const url = "https://sisoseller.github.io/solaxrd/download/SolaxRD.apk?v=" + remote;
+          const result = String(N.installUpdate(url) || "");
+          if (result === "same") {
+            try { N.store("skip-aver", String(remote)); } catch (e) { /* skip */ }
+            payload = { ok: true, current: true, exit: false };
+          } else if (result === "1") payload = { ok: true, exit: false };
+          else if (result === "perm") payload = { ok: false, error: "Consenti l’installazione di SolaxRD, poi premi di nuovo Installa ora." };
+          else payload = { ok: false, error: "Aggiornamento non installato. Scaricalo dal sito." };
+        }
       }
       else return jsonResponse({ ok: false, error: "Non trovato." }, 404);
       return jsonResponse(payload);

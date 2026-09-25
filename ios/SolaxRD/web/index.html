@@ -2,6 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
+  <script>if(/iPhone|iPad|Android/i.test(navigator.userAgent)||matchMedia("(max-width:860px)").matches)document.documentElement.classList.add("phone");</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Permissions-Policy" content="microphone=*, camera=*, display-capture=*, speaker-selection=*">
   <title>SolaxRD</title>
@@ -19,7 +20,10 @@
       <button type="button" class="tl tl-max" id="win-max" title="Ingrandisci" aria-label="Ingrandisci"></button>
     </div>
   </header>
-  <div id="boot" class="center-screen">Apro SolaxRD…</div>
+  <div id="boot" class="center-screen boot-screen">
+    <img class="boot-mark" src="/favicon.png" alt="">
+    <p>Avvio…</p>
+  </div>
 
   <div id="auth-wrap" class="center-screen" hidden>
     <section id="auth">
@@ -99,6 +103,7 @@
             <p id="thread-sub">Messaggi</p>
           </div>
         </div>
+          <button type="button" class="ghost icon" id="people-toggle" hidden aria-label="Persone del gruppo">⌄</button>
           <button class="primary" id="call" type="button">Chiama</button>
         </header>
         <div id="messages" class="messages"></div>
@@ -119,6 +124,7 @@
           <video id="local-video" autoplay playsinline muted hidden></video>
         </div>
         <div class="live-actions">
+          <label class="stream-vol">Stream <input id="stream-vol" type="range" min="0" max="100" step="5" value="100"></label>
           <span id="status" aria-live="polite">In chiamata</span>
           <button class="ghost" id="mute" type="button">Muto</button>
           <button class="ghost" id="camera" type="button">Camera</button>
@@ -260,8 +266,10 @@
           <label class="field" id="speaker-field">Audio in uscita <select id="speaker"></select></label>
           <label class="field">Camera <select id="cam"></select></label>
           <p class="lead" id="media-hint"></p>
+          <button type="button" class="ghost" id="reask-media">Reimposta consensi</button>
           <label class="field">Volume microfono <input id="set-mic-vol" type="range" min="0" max="100" step="5"></label>
           <label class="field">Volume in arrivo <input id="set-out-vol" type="range" min="0" max="100" step="5"></label>
+          <label class="field">Volume stream <input id="set-stream-vol" type="range" min="0" max="100" step="5" value="100"></label>
           <button type="button" class="switch" id="set-echo">Togli l’eco</button>
           <button type="button" class="switch" id="set-noise">Riduci il rumore</button>
           <button type="button" class="switch" id="set-gain">Livella il volume</button>
@@ -296,7 +304,7 @@
           <h2>Sistema</h2>
           <button type="button" class="switch" id="set-top">Sempre in primo piano</button>
           <button type="button" class="switch" id="set-startup">Apri all’avvio di Windows</button>
-          <p id="version-label" class="lead">Versione</p>
+          <p id="version-label" class="lead">1.0.6</p>
           <div class="actions">
             <button type="button" class="primary" id="check-update">Controlla aggiornamento</button>
             <button type="button" class="ghost" id="clear-chats">Svuota elenco chat</button>
@@ -366,7 +374,6 @@
   <audio id="remote-audio" autoplay></audio>
   <div id="call-audios" hidden></div>
   <script src="/vendor/peerjs.min.js"></script>
-  <script src="/backend.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

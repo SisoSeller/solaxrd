@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.5";
+const RELEASE_NAME = "1.0.6";
 const bootAt = Date.now();
 
 const els = {
@@ -1782,7 +1782,10 @@ function attachLink(link) {
       return;
     }
     if (state.groupCall && state.groupCall.peers[link.peer]) {
-      if (msg.t === "hangup") return;
+      if (msg.t === "hangup") {
+        dropGroupPeer(link.peer);
+        return;
+      }
       if (msg.t === "accept") return;
     }
     if (state.link === link || state.incoming === link) onSignal(msg);
@@ -2167,18 +2170,43 @@ function rememberGroupPeer(peerId, extra) {
   return cur;
 }
 
+function presentCallNames() {
+  const names = [];
+  const add = (name) => {
+    if (!name || names.some((item) => sameName(item, name))) return;
+    names.push(name);
+  };
+  if (state.me && state.me.name) add(state.me.name);
+  Object.values((state.groupCall && state.groupCall.peers) || {}).forEach((peer) => {
+    // Solo chi ha davvero mandato audio/video in call — non tutti i membri del gruppo.
+    if (peer && peer.name && peer.audio && peer.audio.srcObject) add(peer.name);
+  });
+  return names;
+}
+
+function dropGroupPeer(peerId) {
+  if (!state.groupCall || !peerId) return;
+  const peer = state.groupCall.peers[peerId];
+  if (!peer) return;
+  try { peer.call && peer.call.close(); } catch (e) { /* closed */ }
+  try { peer.video && peer.video.close(); } catch (e) { /* closed */ }
+  try { peer.link && peer.link.close(); } catch (e) { /* closed */ }
+  if (peer.audio) {
+    try { peer.audio.srcObject = null; peer.audio.remove(); } catch (e) { /* gone */ }
+  }
+  delete state.groupCall.peers[peerId];
+  paintLivePeople();
+}
+
 function paintLivePeople() {
   const box = $("live-people");
   if (!box || !state.groupCall) return;
-  const names = (state.groupCall.members || []).slice();
-  if (state.me && !names.some((name) => sameName(name, state.me.name))) names.unshift(state.me.name);
+  const names = presentCallNames();
   box.hidden = false;
-  const seen = new Set();
   [...box.children].forEach((node) => {
     if (!names.some((name) => sameName(name, node.dataset.name))) node.remove();
   });
   names.forEach((name) => {
-    seen.add(name);
     let tile = [...box.children].find((node) => sameName(node.dataset.name, name));
     if (!tile) {
       tile = document.createElement("div");
@@ -2259,11 +2287,7 @@ function bindGroupVoice(call, name) {
   });
   call.on("close", () => {
     if (!state.groupCall || !state.groupCall.peers[call.peer] || state.groupCall.peers[call.peer].call !== call) return;
-    const peer = state.groupCall.peers[call.peer];
-    if (peer.audio) {
-      try { peer.audio.srcObject = null; peer.audio.remove(); } catch (e) { /* gone */ }
-    }
-    delete state.groupCall.peers[call.peer];
+    dropGroupPeer(call.peer);
   });
   call.on("error", () => {});
 }
@@ -2773,7 +2797,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.5.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.6.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
