@@ -175,7 +175,7 @@ function isBlocked(name) {
   return (state.settings.blocked || []).some((item) => item.toLocaleLowerCase("it") === key);
 }
 
-const THEMES = ["dark", "light", "purple", "blue", "green", "rose"];
+const THEMES = ["dark", "light", "purple", "blue", "green", "rose", "orange", "gold", "teal", "crimson", "indigo"];
 
 function blankSettings() {
   return {
@@ -187,6 +187,7 @@ function blankSettings() {
     zoom: 100,
     micVolume: 100,
     outputVolume: 100,
+    streamVolume: 100,
     cameraQuality: "low",
     screenFps: 30,
     screenRes: 720,
@@ -245,6 +246,7 @@ function applyLocal() {
   document.body.classList.toggle("compact", !!settings.compact);
   document.body.classList.toggle("reduce", settings.reduceMotion !== false);
   applyOutputVolume();
+  applyStreamVolume();
   const status = settings.status || "online";
   const mine = statusDotClass();
   if (els.meStatus) els.meStatus.className = mine;
@@ -273,6 +275,10 @@ function applyLocal() {
   const micVol = $("set-mic-vol");
   if (micVol) micVol.value = String(settings.micVolume ?? 100);
   const outVol = $("set-out-vol");
+  const streamVol = $("set-stream-vol");
+  if (streamVol) streamVol.value = String(settings.streamVolume ?? 100);
+  const liveStream = $("stream-vol");
+  if (liveStream) liveStream.value = String(settings.streamVolume ?? 100);
   if (outVol) outVol.value = String(settings.outputVolume ?? 100);
   renderBlocked();
 }
@@ -888,6 +894,21 @@ function renderBlocked() {
   });
 }
 
+async function reaskMedia() {
+  const hint = $("media-hint");
+  if (window.SolaxNative && window.SolaxNative.reaskMedia) {
+    try { window.SolaxNative.reaskMedia(); } catch (e) { /* browser prompt still runs */ }
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    stream.getTracks().forEach((track) => track.stop());
+    if (hint) hint.textContent = "Microfono e camera consentiti.";
+    await refreshDevices().catch(() => {});
+  } catch (e) {
+    if (hint) hint.textContent = "Compare di nuovo la richiesta. Se non esce, consenti microfono e camera nelle impostazioni del telefono.";
+  }
+}
+
 function unlockAudio() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
@@ -921,7 +942,7 @@ function ringTone() {
   const play = (freq, start, stop, volume) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = "square";
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, now + start);
     gain.gain.exponentialRampToValueAtTime(volume, now + start + 0.03);
@@ -931,10 +952,10 @@ function ringTone() {
     osc.start(now + start);
     osc.stop(now + stop + 0.02);
   };
-  play(440, 0, 0.28, 0.16);
-  play(554, 0.08, 0.36, 0.14);
-  play(440, 0.44, 0.72, 0.16);
-  play(554, 0.52, 0.8, 0.14);
+  play(523, 0, 0.34, 0.72);
+  play(659, 0.1, 0.44, 0.68);
+  play(523, 0.48, 0.82, 0.72);
+  play(659, 0.58, 0.92, 0.68);
 }
 
 function startRing() {
@@ -1247,9 +1268,20 @@ function hideRemoteVideo() {
   els.remoteVideo.hidden = true;
 }
 
+function streamLevel() {
+  return clampNum(state.settings.streamVolume, 0, 100, 100) / 100;
+}
+
+function applyStreamVolume() {
+  const volume = streamLevel();
+  if (els.remoteVideo) els.remoteVideo.volume = volume;
+  document.querySelectorAll(".live-tile video").forEach((video) => { video.volume = volume; });
+}
+
 function showRemoteVideo(stream) {
   els.remoteVideo.srcObject = stream;
   els.remoteVideo.hidden = false;
+  els.remoteVideo.volume = streamLevel();
   const play = els.remoteVideo.play();
   if (play) play.catch(() => {});
 }
@@ -1282,6 +1314,9 @@ function endCall(message, notify) {
   stopRing();
   clearTimers();
   els.incoming.hidden = true;
+  if (window.SolaxNative && window.SolaxNative.cancelCall) {
+    try { window.SolaxNative.cancelCall(); } catch (e) { /* skip */ }
+  }
   if (notify !== false && wasBusy && link) {
     try { link.send({ t: "hangup" }); } catch (e) { /* already gone */ }
   }
@@ -1401,11 +1436,11 @@ async function publishVideo(stream, kind) {
   await stopExtra(false);
   const track = stream.getVideoTracks()[0];
   if (track) track.contentHint = kind === "screen" ? "detail" : "motion";
-  if (state.settings.showPreview !== false || kind === "screen") {
-    els.localVideo.srcObject = stream;
-    els.localVideo.hidden = false;
-    els.localVideo.classList.toggle("mirror", kind === "camera");
-  }
+  els.localVideo.srcObject = stream;
+  els.localVideo.hidden = false;
+  els.localVideo.classList.toggle("mirror", kind === "camera");
+  const localPlay = els.localVideo.play();
+  if (localPlay) localPlay.catch(() => {});
   state.camOn = kind === "camera";
   state.screenOn = kind === "screen";
   updateToggles();
@@ -1534,7 +1569,7 @@ async function grabDisplay(surface, fps, size) {
   };
   const options = {
     video,
-    audio: false,
+    audio: true,
     monitorTypeSurfaces: surface === "window" ? "exclude" : "include",
     selfBrowserSurface: "exclude",
     surfaceSwitching: "include",
@@ -1566,10 +1601,26 @@ function linkIsNoise(link) {
   return !!(meta.file || meta.avatar);
 }
 
+function phoneCallAlert(label) {
+  if (!phoneLayout()) return;
+  const who = String(label || "Qualcuno");
+  const native = window.SolaxNative;
+  if (native && native.notifyCall) {
+    try { native.notifyCall(who); } catch (e) { /* banner stays */ }
+  }
+  try {
+    if (typeof Notification === "function" && Notification.permission === "granted") {
+      new Notification("SolaxRD", { body: `${who} ti sta chiamando` });
+    }
+  } catch (e) { /* in-app banner stays */ }
+}
+
 function showIncoming(label) {
   els.incomingTitle.textContent = `${label} ti sta chiamando`;
   els.incoming.hidden = false;
   els.hangup.disabled = false;
+  phoneCallAlert(label);
+  unlockAudio();
 }
 
 function whenOpen(link, ms) {
@@ -2096,6 +2147,7 @@ function attachGroupStream(peerId, name, stream) {
       if (video && hasVideo) {
         video.srcObject = stream;
         video.hidden = false;
+        video.volume = streamLevel();
         const go = video.play();
         if (go) go.catch(() => {});
       }
@@ -2226,6 +2278,7 @@ function beginIncomingGroup(link, msg) {
   };
   els.incomingTitle.textContent = `${cleanLabel(msg.name)} ti chiama nel gruppo ${msg.gname || "Gruppo"}`;
   els.incoming.hidden = false;
+  phoneCallAlert(cleanLabel(msg.name));
   els.hangup.disabled = false;
   startRing();
   later(() => {
@@ -2820,7 +2873,21 @@ function bindSettings() {
   bindNumber("set-screen-fps", "screenFps", 30, 160, 30);
   bindNumber("set-screen-res", "screenRes", 360, 1440, 720);
   bindChange("set-mic-vol", async () => { state.settings.micVolume = Number($("set-mic-vol").value); await persist(); });
-  bindChange("set-out-vol", async () => { state.settings.outputVolume = Number($("set-out-vol").value); await persist(); });
+  bindChange("set-out-vol", async () => { state.settings.outputVolume = Number($("set-out-vol").value); await persist(); applyOutputVolume(); });
+  bindChange("set-stream-vol", async () => { state.settings.streamVolume = Number($("set-stream-vol").value); await persist(); applyStreamVolume(); });
+  const syncStream = (value) => {
+    state.settings.streamVolume = Number(value);
+    const box = $("set-stream-vol");
+    const live = $("stream-vol");
+    if (box) box.value = String(state.settings.streamVolume);
+    if (live) live.value = String(state.settings.streamVolume);
+    applyStreamVolume();
+    persistSoon();
+  };
+  if ($("set-stream-vol")) $("set-stream-vol").addEventListener("input", () => syncStream($("set-stream-vol").value));
+  if ($("stream-vol")) $("stream-vol").addEventListener("input", () => syncStream($("stream-vol").value));
+  const reask = $("reask-media");
+  if (reask) reask.addEventListener("click", () => { reaskMedia().catch(() => {}); });
   if ($("set-mic-vol")) $("set-mic-vol").addEventListener("input", () => {
     state.settings.micVolume = Number($("set-mic-vol").value);
     persistSoon();

@@ -108,6 +108,13 @@
     return [display, null];
   }
 
+  function parseNewName(value) {
+    const [display, err] = parseName(value);
+    if (err) return [null, err.indexOf("Usa lettere") === 0 ? "Il nome non può avere emoji." : err];
+    if (display.includes(" ")) return [null, "Il nome non può avere spazi."];
+    return [display, null];
+  }
+
   function parsePassword(value) {
     if (typeof value !== "string" || value.length < 4 || value.length > 64) return "La password deve avere da 4 a 64 caratteri.";
     if ([...value].some((ch) => ch.charCodeAt(0) < 32)) return "Password non valida.";
@@ -484,7 +491,7 @@
   }
 
   async function register(username, password) {
-    const [display, nameError] = parseName(username);
+    const [display, nameError] = parseNewName(username);
     if (nameError) return { ok: false, error: nameError };
     const passwordError = parsePassword(password);
     if (passwordError) return { ok: false, error: passwordError };
@@ -1352,7 +1359,7 @@
           const rec = await fetchRecord(userKey(me.name));
           if (!rec || !verifyPassword(data.password, rec)) payload = { ok: false, error: "Password non valida." };
           else {
-            const [display, err] = parseName(data.name);
+            const [display, err] = parseNewName(data.name);
             if (err) payload = { ok: false, error: err };
             else if (normalize(display) === normalize(me.name)) {
               saveSession(display);
