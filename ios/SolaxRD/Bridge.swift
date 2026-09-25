@@ -1,7 +1,11 @@
 import CryptoKit
 import Foundation
-import UIKit
 import UserNotifications
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 enum SolaxConfig {
     static let store = "3o78cPFRssNR_su3wqJIA6MPl9uBrtp1"
@@ -203,7 +207,11 @@ enum SolaxBridge {
     private static func openDownload() {
         guard let url = URL(string: "https://sisoseller.github.io/solaxrd/#get") else { return }
         DispatchQueue.main.async {
+            #if os(iOS)
             UIApplication.shared.open(url)
+            #else
+            NSWorkspace.shared.open(url)
+            #endif
         }
     }
 

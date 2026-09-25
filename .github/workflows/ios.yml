@@ -1,4 +1,4 @@
-name: iOS
+name: Apple
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
       - ".github/workflows/ios.yml"
 
 jobs:
-  ipa:
+  apps:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Build unsigned iPhone app
+      - name: Build iPhone and Mac apps
         run: |
           set -euo pipefail
           xcodebuild \
@@ -20,18 +20,35 @@ jobs:
             -scheme SolaxRD \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath ios/build \
+            -derivedDataPath ios/build-ios \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
-          APP="ios/build/Build/Products/Release-iphoneos/SolaxRD.app"
+          APP="ios/build-ios/Build/Products/Release-iphoneos/SolaxRD.app"
           test -d "$APP"
           rm -rf ios/Payload
           mkdir ios/Payload
           cp -R "$APP" ios/Payload/
           rm -f ios/SolaxRD.ipa
           (cd ios && zip -qry SolaxRD.ipa Payload)
+          xcodebuild \
+            -project ios/SolaxRD.xcodeproj \
+            -scheme SolaxRD \
+            -configuration Release \
+            -destination "platform=macOS,variant=Mac Catalyst" \
+            -derivedDataPath ios/build-mac \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-"
+          MAC=$(find ios/build-mac/Build/Products -name "SolaxRD.app" -type d | head -1)
+          test -n "$MAC"
+          codesign --force --deep --sign - "$MAC"
+          rm -f ios/SolaxRD-Mac.zip
+          ditto -c -k --keepParent "$MAC" ios/SolaxRD-Mac.zip
       - uses: actions/upload-artifact@v4
         with:
           name: SolaxRD-ipa
           path: ios/SolaxRD.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SolaxRD-mac
+          path: ios/SolaxRD-Mac.zip
