@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.0";
+const RELEASE_NAME = "1.0.1";
 const bootAt = Date.now();
 
 const els = {
@@ -1792,13 +1792,31 @@ function attachLink(link) {
   });
 }
 
+let peerBoot = 0;
+
+function softRestartPeer(delayMs) {
+  if (state.loggingOut) return;
+  const boot = ++peerBoot;
+  state.peerReady = false;
+  const old = state.peer;
+  state.peer = null;
+  try { if (old && !old.destroyed) old.destroy(); } catch (e) { /* already gone */ }
+  els.net.textContent = "Riconnessione…";
+  later(() => {
+    if (boot !== peerBoot || state.loggingOut || state.peer) return;
+    startPeer();
+  }, Math.max(400, delayMs || 1000));
+}
+
 function startPeer() {
   if (!window.Peer) {
     els.net.textContent = "Chiamate non disponibili";
     return;
   }
+  if (!state.me || !state.me.peerId) return;
   state.loggingOut = false;
   state.peerReady = false;
+  const boot = ++peerBoot;
   const peer = new Peer(state.me.peerId, {
     secure: true,
     config: {
@@ -1816,6 +1834,7 @@ function startPeer() {
   });
   state.peer = peer;
   peer.on("open", () => {
+    if (boot !== peerBoot || state.peer !== peer) return;
     state.peerReady = true;
     state.retries = 0;
     els.net.textContent = "In linea";
@@ -1823,19 +1842,42 @@ function startPeer() {
   });
   peer.on("disconnected", () => {
     state.peerReady = false;
-    if (state.loggingOut || !state.peer || state.peer.destroyed) return;
+    if (state.loggingOut || state.peer !== peer || peer.destroyed) return;
     state.retries += 1;
-    if (state.retries > 6) { els.net.textContent = "Offline"; return; }
     els.net.textContent = "Riconnessione…";
-    later(() => { try { peer.reconnect(); } catch (e) { /* retry later */ } }, 1500 * state.retries);
+    if (state.retries > 3) {
+      softRestartPeer(1200 + state.retries * 400);
+      state.retries = 0;
+      return;
+    }
+    later(() => {
+      if (boot !== peerBoot || state.peer !== peer || peer.destroyed || state.loggingOut) return;
+      try { peer.reconnect(); } catch (e) { softRestartPeer(1500); }
+    }, 1200 * state.retries);
+  });
+  peer.on("close", () => {
+    if (state.loggingOut || state.peer !== peer) return;
+    state.peerReady = false;
+    softRestartPeer(1500);
   });
   peer.on("error", (err) => {
+    if (state.loggingOut || state.peer !== peer) return;
     const type = err && err.type;
     if (type === "peer-unavailable") {
       /* first lookup is often empty; outgoing calls retry instead of hanging up */
     }
-    else if (type === "unavailable-id") els.net.textContent = "Account già aperto";
-    else if (type === "network" || type === "server-error" || type === "socket-error") els.net.textContent = "Connessione assente";
+    else if (type === "unavailable-id") {
+      /* dopo un aggiornamento l’ID resta occupato qualche secondo */
+      els.net.textContent = "Riconnessione…";
+      softRestartPeer(2800);
+    }
+    else if (type === "network" || type === "server-error" || type === "socket-error" || type === "socket-closed") {
+      els.net.textContent = "Riconnessione…";
+      later(() => {
+        if (boot !== peerBoot || state.peerReady || state.loggingOut) return;
+        softRestartPeer(1600);
+      }, 2000);
+    }
   });
   peer.on("connection", (link) => {
     attachLink(link);
@@ -1927,6 +1969,7 @@ function startPeer() {
 
 function destroyPeer() {
   state.loggingOut = true;
+  peerBoot += 1;
   state.peerReady = false;
   endCall("", false);
   stopMic();
@@ -2713,8 +2756,8 @@ async function checkUpdate() {
   if ($("update-title") && pending) $("update-title").textContent = RELEASE_NAME;
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
-      ? "C’è la versione 1.0.0. Premi Installa ora e conferma l’installazione sul telefono."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.0.";
+      ? "C’è la versione 1.0.1. Premi Installa ora e conferma l’installazione sul telefono."
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.1.";
   }
   const ready = pending;
   if (!ready) {
@@ -3056,7 +3099,7 @@ async function loadAvatar() {
 
 async function saveAvatar(file) {
   const image = await createImageBitmap(file);
-  const size = 48;
+  const size = 96;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -3066,11 +3109,11 @@ async function saveAvatar(file) {
   const height = image.height * scale;
   ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
   let blob = null;
-  for (const quality of [0.62, 0.48, 0.34]) {
+  for (const quality of [0.72, 0.58, 0.42, 0.28]) {
     blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= 1400) break;
+    if (blob && blob.size <= 12000) break;
   }
-  if (!blob || blob.size > 1600) { els.listError.textContent = "Foto non salvata."; return; }
+  if (!blob || blob.size > 28000) { els.listError.textContent = "Foto non salvata."; return; }
   const res = await fetch("/api/avatar", { method: "POST", body: blob });
   const data = await res.json();
   if (!data.ok) { els.listError.textContent = data.error || "Foto non salvata."; return; }
