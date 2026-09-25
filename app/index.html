@@ -4,18 +4,11 @@
   <meta charset="utf-8">
   <script>if(/iPhone|iPad|Android/i.test(navigator.userAgent)||matchMedia("(max-width:860px)").matches)document.documentElement.classList.add("phone");</script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="SolaxRD">
-  <meta name="theme-color" content="#0c0c0e">
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="favicon.png">
   <meta http-equiv="Permissions-Policy" content="microphone=*, camera=*, display-capture=*, speaker-selection=*">
   <title>SolaxRD</title>
-  <link rel="icon" href="favicon.png">
-  <link rel="stylesheet" href="app.css">
-  <link rel="stylesheet" href="app-mobile.css">
-  <link rel="stylesheet" href="web.css">
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/app-mobile.css">
 </head>
 <body class="theme-dark">
   <header class="titlebar">
@@ -28,13 +21,13 @@
     </div>
   </header>
   <div id="boot" class="center-screen boot-screen">
-    <img class="boot-mark" src="favicon.png" alt="">
+    <img class="boot-mark" src="/favicon.png" alt="">
     <p>Avvio…</p>
   </div>
 
   <div id="auth-wrap" class="center-screen" hidden>
     <section id="auth">
-      <div class="brand"><img class="mark" src="favicon.png" alt=""> SolaxRD</div>
+      <div class="brand"><img class="mark" src="/favicon.png" alt=""> SolaxRD</div>
       <div class="theme-picks" role="group" aria-label="Colore">
         <button type="button" id="theme-dark" data-theme="dark" title="Nero">Nero</button>
         <button type="button" id="theme-light" data-theme="light" title="Bianco">Bianco</button>
@@ -45,7 +38,6 @@
       </div>
       <h1>Entra</h1>
       <p class="lead">Nome e password. Ogni nome è unico. La password resta segreta.</p>
-      <p class="lead" id="web-hint">Su iPhone, in Safari: Condividi, poi Aggiungi a Home.</p>
       <form id="auth-form">
         <label class="field">Nome
           <input id="username" name="username" autocomplete="username" maxlength="24" required>
@@ -64,7 +56,7 @@
 
   <div id="shell" class="shell" hidden>
     <aside class="rail">
-      <img class="mark big" src="favicon.png" alt="">
+      <img class="mark big" src="/favicon.png" alt="">
       <button type="button" class="rail-btn active" id="nav-chats" aria-label="Chat" title="Chat">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v8.2a2 2 0 0 1-2 2H9.2L5 20.2V6.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
       </button>
@@ -173,7 +165,7 @@
     </footer>
     <section id="settings" class="settings" hidden>
       <nav class="set-nav" aria-label="Impostazioni">
-        <div class="set-brand"><img class="mark" src="favicon.png" alt=""> Opzioni</div>
+        <div class="set-brand"><img class="mark" src="/favicon.png" alt=""> Opzioni</div>
         <button type="button" data-panel="account" class="active">Account</button>
         <button type="button" data-panel="look">Aspetto</button>
         <button type="button" data-panel="voice">Voce e video</button>
@@ -311,7 +303,7 @@
           <h2>Sistema</h2>
           <button type="button" class="switch" id="set-top">Sempre in primo piano</button>
           <button type="button" class="switch" id="set-startup">Apri all’avvio di Windows</button>
-          <p id="version-label" class="lead">1.0.10</p>
+          <p id="version-label" class="lead">1.0.11</p>
           <div class="actions">
             <button type="button" class="primary" id="check-update">Controlla aggiornamento</button>
             <button type="button" class="ghost" id="clear-chats">Svuota elenco chat</button>
@@ -325,7 +317,7 @@
 
   <div id="update-banner" class="update" hidden>
     <div class="update-card" role="dialog" aria-modal="true" aria-labelledby="update-title">
-      <img class="update-mark" src="favicon.png" alt="">
+      <img class="update-mark" src="/favicon.png" alt="">
       <p class="eyebrow">SolaxRD</p>
       <h2 id="update-title">Nuova versione</h2>
       <p id="update-copy" class="lead">C’è un aggiornamento pronto. Premi Installa: l’app si chiude e si riapre nuova.</p>
@@ -380,7 +372,7 @@
   </div>
   <audio id="remote-audio" autoplay></audio>
   <div id="call-audios" hidden></div>
-  <script src="vendor/peerjs.min.js"></script>
-  <script src="app.js"></script>
+  <script src="/vendor/peerjs.min.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.10";
+const RELEASE_NAME = "1.0.11";
 const bootAt = Date.now();
 
 const els = {
@@ -95,6 +95,10 @@ const state = {
   loopGen: 0,
   persistGen: 0,
   avatarTick: 1,
+  callLiveAt: 0,
+  hangupWatch: 0,
+  voicePlacing: false,
+  remoteBye: false,
 };
 
 function readMsg(data) {
@@ -1004,6 +1008,42 @@ function later(fn, ms) {
 function clearTimers() {
   state.timers.forEach((id) => window.clearTimeout(id));
   state.timers = [];
+  if (state.hangupWatch) {
+    window.clearTimeout(state.hangupWatch);
+    state.hangupWatch = 0;
+  }
+}
+
+function markCallLive() {
+  if (!state.callLiveAt) state.callLiveAt = Date.now();
+  if (state.hangupWatch && mediaStillLive()) {
+    window.clearTimeout(state.hangupWatch);
+    state.hangupWatch = 0;
+    state.remoteBye = false;
+  }
+}
+
+function watchRemoteHangup(message) {
+  if (state.hangupWatch) window.clearTimeout(state.hangupWatch);
+  state.hangupWatch = window.setTimeout(() => {
+    state.hangupWatch = 0;
+    if (state.phase === "idle") return;
+    if (mediaStillLive()) return;
+    endCall(message || "Chiamata chiusa.", false);
+  }, 7000);
+}
+
+function shouldIgnoreHangup() {
+  if (state.groupCall) return false;
+  if (state.phase === "live") {
+    const age = Date.now() - (state.callLiveAt || 0);
+    if (mediaStillLive()) return true;
+    // PeerJS manda hangup spurii mentre ICE sta ancora partendo (~1–3s).
+    if (age < 12000) return true;
+    return false;
+  }
+  if (state.phase === "out" && (state.voice || state.pendingCall || state.link)) return true;
+  return false;
 }
 
 function deviceName(device, index) {
@@ -1271,6 +1311,7 @@ function openCallStage() {
 
 function showLiveUI() {
   openCallStage();
+  markCallLive();
   els.call.disabled = true;
   const people = $("live-people");
   if (people) people.hidden = false;
@@ -1396,6 +1437,13 @@ function endCall(message, notify) {
   state.videoCall = null;
   state.remotePeerId = "";
   state.ptt = false;
+  state.callLiveAt = 0;
+  state.remoteBye = false;
+  state.voicePlacing = false;
+  if (state.hangupWatch) {
+    window.clearTimeout(state.hangupWatch);
+    state.hangupWatch = 0;
+  }
   hushMic();
   stopLocalVideo();
   els.remoteAudio.srcObject = null;
@@ -1452,10 +1500,37 @@ function bindVoice(call) {
     } else if (state.phase === "live") {
       showLiveUI();
     }
+    paintDirectCall();
   });
-  // PeerJS chiude spesso il MediaConnection senza che la call sia davvero finita:
-  // non appendiamo endCall qui, altrimenti dopo ~2s cade tutto.
-  call.on("close", () => {});
+  // PeerJS chiude spesso il MediaConnection senza che la call sia davvero finita.
+  call.on("close", () => {
+    if (state.voice !== call) return;
+    if (state.phase !== "live" && state.phase !== "out") return;
+    window.setTimeout(() => {
+      if (state.voice !== call || state.phase === "idle") return;
+      if (mediaStillLive()) return;
+      if (state.remoteBye) {
+        endCall("Chiamata chiusa.", false);
+        return;
+      }
+      const age = Date.now() - (state.callLiveAt || 0);
+      if (state.phase === "live" && state.remotePeerId && age < 25000) {
+        ensureMic().then((stream) => {
+          if (state.phase !== "live" || state.remoteBye || !micLive(stream)) return;
+          if (mediaStillLive()) return;
+          placeVoice(state.remotePeerId, stream);
+        }).catch(() => {});
+        window.setTimeout(() => {
+          if (state.phase === "idle" || state.remoteBye) return;
+          if (mediaStillLive()) return;
+          if (state.voice && state.voice !== call) return;
+          endCall("Connessione persa.", false);
+        }, 9000);
+        return;
+      }
+      endCall("Connessione persa.", false);
+    }, 3500);
+  });
   call.on("error", () => {
     if (state.voice !== call) return;
     if (state.phase === "out") setStatus("Rete instabile, resto in attesa…");
@@ -1471,6 +1546,10 @@ function bindVoice(call) {
         if (state.voice !== call || state.phase !== "live") return;
         if (pc.connectionState !== "failed") return;
         if (mediaStillLive()) return;
+        if (state.remoteBye) {
+          endCall("Chiamata chiusa.", false);
+          return;
+        }
         endCall("Connessione persa.", false);
       }, 10000);
     };
@@ -1752,15 +1831,11 @@ function onSignal(msg) {
     stopRing();
     clearTimers();
     showLiveUI();
-    if (!state.voice) {
+    if (!state.voice || !state.voice.open) {
       ensureMic().then((stream) => {
         if (state.phase !== "live") return;
-        const call = state.peer.call(state.remotePeerId, stream, {
-          metadata: { kind: "voice", name: state.me.name },
-        });
-        if (!call) { endCall("Chiamata non partita. Riprova."); return; }
-        state.voice = call;
-        bindVoice(call);
+        if (state.voice && state.voice.open) return;
+        placeVoice(state.remotePeerId, stream);
       }).catch(() => endCall("Microfono non disponibile."));
     }
     return;
@@ -1769,8 +1844,12 @@ function onSignal(msg) {
   if (msg.t === "reject" && state.phase === "out" && !state.groupCall) endCall("Ha rifiutato.", false);
   if (msg.t === "busy" && state.phase === "out" && !state.voice && !state.groupCall) endCall("È già in chiamata.", false);
   if (msg.t === "hangup" && !state.groupCall) {
-    // Ignora hangup spurii mentre l'audio è ancora vivo.
-    if (state.phase === "live" && mediaStillLive()) return;
+    state.remoteBye = true;
+    // Hangup spurii di PeerJS arrivano spesso a ~1–2s: non chiudere subito.
+    if (shouldIgnoreHangup()) {
+      watchRemoteHangup("Chiamata chiusa.");
+      return;
+    }
     endCall("Chiamata chiusa.", false);
   }
   if (msg.t === "video-end" && !state.groupCall) hideRemoteVideo();
@@ -2034,10 +2113,19 @@ function startPeer() {
       return;
     }
     if (state.remotePeerId && call.peer === state.remotePeerId) {
+      // Evita doppie MediaConnection: PeerJS ne chiude una e la call cade a ~2s.
+      if (state.phase === "live" && state.voice && state.voice !== call && (state.voice.open || mediaStillLive())) {
+        try { call.close(); } catch (e) { /* keep current */ }
+        return;
+      }
       state.pendingCall = call;
       if (state.phase === "live") {
         ensureMic().then((stream) => {
           if (state.phase !== "live") return;
+          if (state.voice && state.voice !== call && (state.voice.open || mediaStillLive())) {
+            try { call.close(); } catch (e) { /* keep current */ }
+            return;
+          }
           call.answer(stream);
           state.voice = call;
           bindVoice(call);
@@ -2082,20 +2170,28 @@ async function waitReady() {
 
 async function placeVoice(peerId, stream) {
   if (!micLive(stream) || !state.peer || state.peer.destroyed) return null;
+  if (state.voice && state.voice.open) return state.voice;
+  if (state.voicePlacing) return state.voice;
+  state.voicePlacing = true;
   let call = null;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    if (state.phase !== "out" && state.phase !== "live") return state.voice;
-    try {
-      call = state.peer.call(peerId, stream, { metadata: { kind: "voice", name: state.me.name } });
-    } catch (e) {
-      call = null;
+  try {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (state.phase !== "out" && state.phase !== "live") return state.voice;
+      if (state.voice && state.voice.open) return state.voice;
+      try {
+        call = state.peer.call(peerId, stream, { metadata: { kind: "voice", name: state.me.name } });
+      } catch (e) {
+        call = null;
+      }
+      if (call) {
+        state.voice = call;
+        bindVoice(call);
+        return call;
+      }
+      await sleep(180);
     }
-    if (call) {
-      state.voice = call;
-      bindVoice(call);
-      return call;
-    }
-    await sleep(180);
+  } finally {
+    state.voicePlacing = false;
   }
   return null;
 }
@@ -2105,11 +2201,12 @@ function placeVoiceSoon(peerId, micTask) {
     let stream = await Promise.resolve(micTask).catch(() => null);
     if (!micLive(stream)) stream = await ensureMic().catch(() => null);
     for (let attempt = 0; attempt < 6 && !micLive(stream); attempt += 1) {
-      if (state.phase !== "out") return;
+      if (state.phase !== "out" && state.phase !== "live") return;
       await sleep(160);
       stream = await ensureMic().catch(() => null);
     }
-    if (state.phase !== "out" || !micLive(stream)) return;
+    if ((state.phase !== "out" && state.phase !== "live") || !micLive(stream)) return;
+    if (state.voice && state.voice.open) return;
     await placeVoice(peerId, stream);
   })();
 }
@@ -2890,7 +2987,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.10.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.11.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
