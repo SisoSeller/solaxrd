@@ -1,4 +1,5 @@
 html.android, body.android { height: 100%; }
+body.android .titlebar, html.phone .titlebar { display: none !important; }
 body.android .traffic { display: none !important; }
 body.android .titlebar-drag { justify-content: flex-start; padding-left: 4px; }
 body.android .welcome { display: none !important; }
@@ -31,12 +32,6 @@ body.android .chat-row.group .row-letter { border-radius: 12px; }
     position: absolute; right: 0; top: 0; bottom: 56px; width: min(280px, 86vw);
     z-index: 30; background: var(--card); box-shadow: -12px 0 40px rgba(0,0,0,.35);
   }
-  body.android .settings {
-    grid-template-columns: 1fr;
-    position: absolute; inset: 0; z-index: 50;
-  }
-  body.android .set-nav { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
-  body.android .set-body { padding: 18px 16px 32px; }
   body.android .panel { padding: 18px; border-radius: 18px; }
   body.android .composer { padding: 10px; }
   body.android .thread-head { padding: 10px 12px; gap: 8px; }
@@ -44,6 +39,48 @@ body.android .chat-row.group .row-letter { border-radius: 12px; }
   body.android .bubble { max-width: 86%; }
   body.android .dock { padding: 8px 10px; }
   body.android input, body.android select { min-width: 0; }
+}
+
+body.android .settings, html.phone .settings {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  background: var(--bg);
+}
+body.android .set-nav, html.phone .set-nav {
+  flex: none;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  max-height: 64px;
+}
+body.android .set-brand, html.phone .set-brand {
+  margin: 0 6px 0 0;
+  flex: none;
+  font-size: 16px;
+}
+body.android .set-nav button, html.phone .set-nav button {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+  white-space: nowrap;
+}
+body.android #settings-close, html.phone #settings-close { margin: 0; }
+body.android #settings-saved, html.phone #settings-saved { flex: none; padding: 0; white-space: nowrap; }
+body.android .set-body, html.phone .set-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 14px 36px;
 }
 
 body.android.chat-open .list { display: none; }
