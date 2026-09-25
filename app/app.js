@@ -830,9 +830,28 @@ function rememberPreview(id, src) {
 
 function loadStoredPreview(img, id) {
   if (!img || !id) return;
-  img.hidden = false;
-  img.onerror = () => { img.hidden = true; };
-  img.src = `/api/files/get?id=${encodeURIComponent(id)}&t=${Date.now()}`;
+  fetch("/api/files/preview?id=" + encodeURIComponent(id)).then(async (res) => {
+    if (!res.ok) throw new Error("missing");
+    const type = res.headers.get("content-type") || "";
+    if (type.includes("json")) {
+      const data = await res.json();
+      if (!data.url) throw new Error("missing");
+      if (img.dataset.file !== id) return;
+      img.hidden = false;
+      img.src = data.url;
+      return;
+    }
+    const blob = await res.blob();
+    if (!blob.size) throw new Error("empty");
+    if (img.dataset.file !== id) return;
+    img.hidden = false;
+    img.src = URL.createObjectURL(blob);
+  }).catch(() => {
+    if (img.dataset.file !== id) return;
+    img.hidden = false;
+    img.onerror = () => { img.hidden = true; };
+    img.src = `/api/files/get?id=${encodeURIComponent(id)}&t=${Date.now()}`;
+  });
 }
 
 function revealFile(id) {
@@ -851,7 +870,7 @@ function bytesToBase64(bytes) {
 }
 
 async function makePreview(file) {
-  if (!file || !isImageFile(file.name, file.type) || file.size > 8 * 1024 * 1024) return { url: "", data: "" };
+  if (!file || !isImageFile(file.name, file.type) || file.size > 8 * 1024 * 1024) return { url: "", data: "", cloud: null };
   try {
     const image = await createImageBitmap(file);
     const maxWidth = 360;
@@ -861,13 +880,25 @@ async function makePreview(file) {
     canvas.height = Math.max(1, Math.round(image.height * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.62));
-    if (!blob) return { url: "", data: "" };
+    if (!blob) return { url: "", data: "", cloud: null };
     const url = URL.createObjectURL(blob);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const data = bytes.length > 70000 ? "" : `data:image/jpeg;base64,${bytesToBase64(bytes)}`;
-    return { url, data };
+    const thumb = document.createElement("canvas");
+    const width = Math.min(canvas.width, 220);
+    const height = Math.max(1, Math.round(canvas.height * (width / canvas.width)));
+    thumb.width = width;
+    thumb.height = height;
+    thumb.getContext("2d").drawImage(canvas, 0, 0, width, height);
+    let cloud = null;
+    for (const quality of [0.62, 0.45, 0.3, 0.2]) {
+      cloud = await new Promise((resolve) => thumb.toBlob(resolve, "image/jpeg", quality));
+      if (cloud && cloud.size <= 2000) break;
+    }
+    if (cloud && cloud.size > 2000) cloud = null;
+    return { url, data, cloud };
   } catch (e) {
-    return { url: "", data: "" };
+    return { url: "", data: "", cloud: null };
   }
 }
 
@@ -3189,6 +3220,9 @@ async function sendFile(file) {
     if (img) img.dataset.file = started.message.file || "";
     if (started.message.n) state.seen.add(String(started.message.n));
     if (started.id && preview.url) rememberPreview(started.id, preview.url);
+  }
+  if (started.id && preview.cloud) {
+    await fetch(`/api/files/preview?id=${encodeURIComponent(started.id)}`, { method: "POST", body: preview.cloud }).catch(() => {});
   }
   const chunk = 256 * 1024;
   for (let offset = 0; offset < file.size; offset += chunk) {

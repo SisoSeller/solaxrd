@@ -1258,6 +1258,35 @@
     try { return JSON.parse(dec.decode(bytes)); } catch (e) { return {}; }
   }
 
+  const PREVIEW_PART = 100;
+  const PREVIEW_PARTS = 24;
+
+  async function writePreview(id, kind, token) {
+    const count = Math.ceil(String(token || "").length / PREVIEW_PART);
+    if (!/^[0-9a-f]{12}$/.test(id || "") || !count || count > PREVIEW_PARTS) return false;
+    for (let i = 0; i < count; i += 1) {
+      const piece = token.slice(i * PREVIEW_PART, (i + 1) * PREVIEW_PART);
+      if (!await kvSet("i" + id + "z" + i, piece)) return false;
+    }
+    return kvSet("i" + id, kind + count);
+  }
+
+  async function readPreview(id) {
+    const raw = await kvGet("i" + id) || "";
+    const kind = raw.charAt(0);
+    if (kind !== "u" && kind !== "j") return { url: "", bytes: null };
+    const count = Number(raw.slice(1)) || 0;
+    if (count < 1 || count > PREVIEW_PARTS) return { url: "", bytes: null };
+    let token = "";
+    for (let i = 0; i < count; i += 1) token += await kvGet("i" + id + "z" + i) || "";
+    if (kind === "u" && token.startsWith("https://")) return { url: token, bytes: null };
+    try {
+      const bytes = urlB64Decode(token);
+      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { url: "", bytes };
+    } catch (e) { /* skip */ }
+    return { url: "", bytes: null };
+  }
+
   window.fetch = async function (input, init) {
     const url = typeof input === "string" ? input : (input && input.url) || String(input);
     let path = url;
@@ -1273,6 +1302,29 @@
     const query = new URLSearchParams(search);
     const method = ((init && init.method) || "GET").toUpperCase();
     try {
+      if (path === "/api/files/preview" && method === "GET") {
+        const id = query.get("id") || "";
+        const got = await readPreview(id);
+        if (got.url) return jsonResponse({ ok: true, url: got.url });
+        if (got.bytes) return binResponse(got.bytes, "image/jpeg", 200);
+        return binResponse(new Uint8Array(), "text/plain", 404);
+      }
+      if (path === "/api/files/preview" && method === "POST") {
+        const id = query.get("id") || "";
+        const bytes = await bodyBytes(init);
+        if (!/^[0-9a-f]{12}$/.test(id) || bytes.length < 32) return jsonResponse({ ok: false }, 400);
+        let url = "";
+        if (N.uploadChatPhoto) url = String(N.uploadChatPhoto(b64FromBytes(bytes)) || "");
+        if (url.startsWith("https://cdn.discordapp.com/") || url.startsWith("https://media.discordapp.net/")) {
+          if (!await writePreview(id, "u", url)) return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+          return jsonResponse({ ok: true, url });
+        }
+        if (bytes.length <= 2200 && bytes[0] === 0xFF && bytes[1] === 0xD8) {
+          if (!await writePreview(id, "j", urlB64(bytes))) return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+          return jsonResponse({ ok: true });
+        }
+        return jsonResponse({ ok: false, error: "Anteprima non salvata." });
+      }
       if (path === "/api/files/get") {
         const id = query.get("id") || "";
         const b64 = N.readFile("f-" + id);
