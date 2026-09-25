@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.1";
+const RELEASE_NAME = "1.0.2";
 const bootAt = Date.now();
 
 const els = {
@@ -175,7 +175,7 @@ function isBlocked(name) {
   return (state.settings.blocked || []).some((item) => item.toLocaleLowerCase("it") === key);
 }
 
-const THEMES = ["dark", "light", "purple", "blue", "green", "rose", "orange", "gold", "teal", "crimson", "indigo"];
+const THEMES = ["dark", "light", "purple", "blue", "green", "rose"];
 
 function blankSettings() {
   return {
@@ -870,32 +870,26 @@ function bytesToBase64(bytes) {
 }
 
 async function makePreview(file) {
-  if (!file || !isImageFile(file.name, file.type) || file.size > 8 * 1024 * 1024) return { url: "", data: "", cloud: null };
+  if (!file || !isImageFile(file.name, file.type) || file.size > 12 * 1024 * 1024) return { url: "", data: "", cloud: null };
   try {
     const image = await createImageBitmap(file);
-    const maxWidth = 360;
+    const maxWidth = 720;
     const scale = Math.min(1, maxWidth / image.width);
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.width * scale));
     canvas.height = Math.max(1, Math.round(image.height * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.62));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
     if (!blob) return { url: "", data: "", cloud: null };
     const url = URL.createObjectURL(blob);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const data = bytes.length > 70000 ? "" : `data:image/jpeg;base64,${bytesToBase64(bytes)}`;
-    const thumb = document.createElement("canvas");
-    const width = Math.min(canvas.width, 220);
-    const height = Math.max(1, Math.round(canvas.height * (width / canvas.width)));
-    thumb.width = width;
-    thumb.height = height;
-    thumb.getContext("2d").drawImage(canvas, 0, 0, width, height);
     let cloud = null;
-    for (const quality of [0.62, 0.45, 0.3, 0.2]) {
-      cloud = await new Promise((resolve) => thumb.toBlob(resolve, "image/jpeg", quality));
-      if (cloud && cloud.size <= 2000) break;
+    for (const quality of [0.78, 0.62, 0.48, 0.34, 0.22]) {
+      cloud = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (cloud && cloud.size <= 250000) break;
     }
-    if (cloud && cloud.size > 2000) cloud = null;
+    if (cloud && cloud.size > 280000) cloud = null;
     return { url, data, cloud };
   } catch (e) {
     return { url: "", data: "", cloud: null };
@@ -1263,6 +1257,10 @@ function paintDirectCall() {
 }
 
 function showLiveUI() {
+  const stage = document.querySelector(".stage");
+  if (stage) stage.classList.add("in-call");
+  if (els.thread) els.thread.hidden = false;
+  if (els.welcome) els.welcome.hidden = true;
   els.live.hidden = false;
   els.call.disabled = true;
   const people = $("live-people");
@@ -1275,11 +1273,18 @@ function showLiveUI() {
     paintDirectCall();
   }
   updateToggles();
+  later(() => {
+    if (els.messages) els.messages.scrollTop = els.messages.scrollHeight;
+  }, 60);
 }
 
 function showIdleUI() {
   els.call.disabled = false;
-  if (state.phase === "idle") els.live.hidden = true;
+  if (state.phase === "idle") {
+    els.live.hidden = true;
+    const stage = document.querySelector(".stage");
+    if (stage) stage.classList.remove("in-call");
+  }
   updateToggles();
 }
 
@@ -2756,8 +2761,12 @@ async function checkUpdate() {
   if ($("update-title") && pending) $("update-title").textContent = RELEASE_NAME;
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
-      ? "C’è la versione 1.0.1. Premi Installa ora e conferma l’installazione sul telefono."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.1.";
+      ? "C’è una versione nuova. Riscarica l’APK dal sito."
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.2.";
+  }
+  if (document.body.classList.contains("android")) {
+    if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
+    if ($("update-chip")) $("update-chip").textContent = "Riscarica APK";
   }
   const ready = pending;
   if (!ready) {
@@ -2778,8 +2787,27 @@ async function checkUpdate() {
   showUpdateChip(false);
 }
 
+function openUpdateSite() {
+  const url = "https://sisoseller.github.io/solaxrd/";
+  try {
+    if (window.SolaxNative && window.SolaxNative.openUrl) {
+      window.SolaxNative.openUrl(url);
+      return;
+    }
+  } catch (e) { /* browser fallback */ }
+  window.open(url, "_blank", "noopener");
+}
+
 async function installUpdate() {
   if (state.updating) return;
+  if (document.body.classList.contains("android")) {
+    openUpdateSite();
+    state.updateSnooze = true;
+    if (els.update) els.update.hidden = true;
+    showUpdateChip(true);
+    if ($("update-chip")) $("update-chip").textContent = "Riscarica APK";
+    return;
+  }
   state.updating = true;
   state.updateSnooze = false;
   showUpdateChip(false);
@@ -2795,9 +2823,7 @@ async function installUpdate() {
     button.textContent = "Installo…";
   }
   if (copy) {
-    copy.textContent = document.body.classList.contains("android")
-      ? "Scarico l’aggiornamento. Tra poco Android chiede di installarlo."
-      : "Scarico la nuova versione. Tra poco SolaxRD si chiude e si riapre da solo.";
+    copy.textContent = "Scarico la nuova versione. Tra poco SolaxRD si chiude e si riapre da solo.";
   }
   const applied = await api("/api/update/apply", {});
   if (applied.ok) {
@@ -3226,6 +3252,7 @@ async function refreshThread() {
 async function sendFile(file) {
   if (!state.active) { els.listError.textContent = "Apri prima una chat."; return; }
   if (file.size > 2 * 1024 * 1024 * 1024) { els.listError.textContent = "Il file può arrivare fino a 2 GB."; return; }
+  const isPhoto = isImageFile(file.name, file.type);
   const preview = await makePreview(file);
   const row = addBubble({
     mine: true,
@@ -3236,7 +3263,7 @@ async function sendFile(file) {
     preview: preview.url,
     at: Math.floor(Date.now() / 1000),
   });
-  els.listError.textContent = "Invio file…";
+  els.listError.textContent = isPhoto ? "Invio foto…" : "Invio file…";
   const started = state.activeKind === "group"
     ? await api("/api/groups/files/start", {
       id: state.active,
@@ -3264,8 +3291,16 @@ async function sendFile(file) {
     if (started.message.n) state.seen.add(String(started.message.n));
     if (started.id && preview.url) rememberPreview(started.id, preview.url);
   }
+  let cloudOk = false;
   if (started.id && preview.cloud) {
-    await fetch(`/api/files/preview?id=${encodeURIComponent(started.id)}`, { method: "POST", body: preview.cloud }).catch(() => {});
+    try {
+      const posted = await fetch(`/api/files/preview?id=${encodeURIComponent(started.id)}`, { method: "POST", body: preview.cloud });
+      const info = await posted.json().catch(() => ({}));
+      if (info && info.ok) {
+        cloudOk = true;
+        if (info.url) rememberPreview(started.id, info.url);
+      }
+    } catch (e) { /* peer delivery still tried */ }
   }
   const chunk = 256 * 1024;
   for (let offset = 0; offset < file.size; offset += chunk) {
@@ -3276,8 +3311,12 @@ async function sendFile(file) {
   }
   els.listError.textContent = "";
   if (started.id) revealFile(started.id);
-  deliverFile(started.id, file, preview.data).catch(() => {
-    els.listError.textContent = "File salvato. L’amico lo riceve quando ha SolaxRD aperto.";
+  deliverFile(started.id, file, preview.data).then(() => {
+    els.listError.textContent = "";
+  }).catch(() => {
+    if (cloudOk && isPhoto) els.listError.textContent = "";
+    else if (isPhoto) els.listError.textContent = "Foto inviata. L’amico la vede appena riapre SolaxRD.";
+    else els.listError.textContent = "File inviato. L’amico lo riceve quando riapre SolaxRD.";
   });
 }
 

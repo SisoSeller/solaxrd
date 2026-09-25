@@ -1,4 +1,6 @@
 const $ = (id) => document.getElementById(id);
+const RELEASE_NAME = "1.0.2";
+const bootAt = Date.now();
 
 const els = {
   boot: $("boot"),
@@ -185,6 +187,7 @@ function blankSettings() {
     zoom: 100,
     micVolume: 100,
     outputVolume: 100,
+    streamVolume: 100,
     cameraQuality: "low",
     screenFps: 30,
     screenRes: 720,
@@ -243,6 +246,7 @@ function applyLocal() {
   document.body.classList.toggle("compact", !!settings.compact);
   document.body.classList.toggle("reduce", settings.reduceMotion !== false);
   applyOutputVolume();
+  applyStreamVolume();
   const status = settings.status || "online";
   const mine = statusDotClass();
   if (els.meStatus) els.meStatus.className = mine;
@@ -271,6 +275,10 @@ function applyLocal() {
   const micVol = $("set-mic-vol");
   if (micVol) micVol.value = String(settings.micVolume ?? 100);
   const outVol = $("set-out-vol");
+  const streamVol = $("set-stream-vol");
+  if (streamVol) streamVol.value = String(settings.streamVolume ?? 100);
+  const liveStream = $("stream-vol");
+  if (liveStream) liveStream.value = String(settings.streamVolume ?? 100);
   if (outVol) outVol.value = String(settings.outputVolume ?? 100);
   renderBlocked();
 }
@@ -328,6 +336,15 @@ function persistSoon() {
   window.clearTimeout(persistWait);
   if (!state.me) return;
   persistWait = window.setTimeout(() => persist(), 280);
+}
+
+function phoneLayout() {
+  return document.documentElement.classList.contains("phone") || document.body.classList.contains("android");
+}
+
+function revealShell(next) {
+  const wait = phoneLayout() ? 0 : Math.max(0, 1100 - (Date.now() - bootAt));
+  window.setTimeout(next, wait);
 }
 
 function showApp() {
@@ -425,10 +442,23 @@ function setView(view) {
   els.settings.hidden = view !== "settings";
   $("nav-chats").classList.toggle("active", view !== "settings");
   $("nav-settings").classList.toggle("active", view === "settings");
+  const peopleToggle = $("people-toggle");
   if (view === "thread" && state.activeKind === "group") {
-    showPeople(true);
+    if (phoneLayout()) {
+      showPeople(false);
+      if (peopleToggle) {
+        peopleToggle.hidden = false;
+        peopleToggle.textContent = "⌄";
+      }
+    } else {
+      showPeople(true);
+      if (peopleToggle) peopleToggle.hidden = true;
+    }
     paintPeople();
-  } else showPeople(false);
+  } else {
+    if (peopleToggle) peopleToggle.hidden = true;
+    showPeople(false);
+  }
   if (view === "settings") primeDevices(false).catch(() => {});
 }
 
@@ -536,7 +566,7 @@ function renderChats() {
   const rows = [];
   (state.chats || []).forEach((chat) => rows.push({ ...chat, kind: chat.kind || "dm" }));
   (state.groups || []).forEach((group) => rows.push({ ...group, kind: "group" }));
-  rows.sort((a, b) => (b.at || 0) - (a.at || 0));
+  rows.sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
   rows.forEach((chat) => {
     const isGroup = chat.kind === "group";
     const key = isGroup ? `g:${chat.id}` : (chat.name || "");
@@ -800,9 +830,28 @@ function rememberPreview(id, src) {
 
 function loadStoredPreview(img, id) {
   if (!img || !id) return;
-  img.hidden = false;
-  img.onerror = () => { img.hidden = true; };
-  img.src = `/api/files/get?id=${encodeURIComponent(id)}&t=${Date.now()}`;
+  fetch("/api/files/preview?id=" + encodeURIComponent(id)).then(async (res) => {
+    if (!res.ok) throw new Error("missing");
+    const type = res.headers.get("content-type") || "";
+    if (type.includes("json")) {
+      const data = await res.json();
+      if (!data.url) throw new Error("missing");
+      if (img.dataset.file !== id) return;
+      img.hidden = false;
+      img.src = data.url;
+      return;
+    }
+    const blob = await res.blob();
+    if (!blob.size) throw new Error("empty");
+    if (img.dataset.file !== id) return;
+    img.hidden = false;
+    img.src = URL.createObjectURL(blob);
+  }).catch(() => {
+    if (img.dataset.file !== id) return;
+    img.hidden = false;
+    img.onerror = () => { img.hidden = true; };
+    img.src = `/api/files/get?id=${encodeURIComponent(id)}&t=${Date.now()}`;
+  });
 }
 
 function revealFile(id) {
@@ -821,23 +870,29 @@ function bytesToBase64(bytes) {
 }
 
 async function makePreview(file) {
-  if (!file || !isImageFile(file.name, file.type) || file.size > 8 * 1024 * 1024) return { url: "", data: "" };
+  if (!file || !isImageFile(file.name, file.type) || file.size > 12 * 1024 * 1024) return { url: "", data: "", cloud: null };
   try {
     const image = await createImageBitmap(file);
-    const maxWidth = 360;
+    const maxWidth = 720;
     const scale = Math.min(1, maxWidth / image.width);
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.width * scale));
     canvas.height = Math.max(1, Math.round(image.height * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.62));
-    if (!blob) return { url: "", data: "" };
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    if (!blob) return { url: "", data: "", cloud: null };
     const url = URL.createObjectURL(blob);
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const data = bytes.length > 70000 ? "" : `data:image/jpeg;base64,${bytesToBase64(bytes)}`;
-    return { url, data };
+    let cloud = null;
+    for (const quality of [0.78, 0.62, 0.48, 0.34, 0.22]) {
+      cloud = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (cloud && cloud.size <= 250000) break;
+    }
+    if (cloud && cloud.size > 280000) cloud = null;
+    return { url, data, cloud };
   } catch (e) {
-    return { url: "", data: "" };
+    return { url: "", data: "", cloud: null };
   }
 }
 
@@ -862,6 +917,21 @@ function renderBlocked() {
     });
     els.blockList.append(button);
   });
+}
+
+async function reaskMedia() {
+  const hint = $("media-hint");
+  if (window.SolaxNative && window.SolaxNative.reaskMedia) {
+    try { window.SolaxNative.reaskMedia(); } catch (e) { /* browser prompt still runs */ }
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    stream.getTracks().forEach((track) => track.stop());
+    if (hint) hint.textContent = "Microfono e camera consentiti.";
+    await refreshDevices().catch(() => {});
+  } catch (e) {
+    if (hint) hint.textContent = "Compare di nuovo la richiesta. Se non esce, consenti microfono e camera nelle impostazioni del telefono.";
+  }
 }
 
 function unlockAudio() {
@@ -897,7 +967,7 @@ function ringTone() {
   const play = (freq, start, stop, volume) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = "sine";
+    osc.type = "square";
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, now + start);
     gain.gain.exponentialRampToValueAtTime(volume, now + start + 0.03);
@@ -907,10 +977,10 @@ function ringTone() {
     osc.start(now + start);
     osc.stop(now + stop + 0.02);
   };
-  play(440, 0, 0.28, 0.16);
-  play(554, 0.08, 0.36, 0.14);
-  play(440, 0.44, 0.72, 0.16);
-  play(554, 0.52, 0.8, 0.14);
+  play(523, 0, 0.34, 0.72);
+  play(659, 0.1, 0.44, 0.68);
+  play(523, 0.48, 0.82, 0.72);
+  play(659, 0.58, 0.92, 0.68);
 }
 
 function startRing() {
@@ -1156,24 +1226,65 @@ function setStatus(text) {
   els.status.textContent = text || "";
 }
 
+function paintDirectCall() {
+  const box = $("live-people");
+  if (!box) return;
+  const names = [];
+  if (state.remoteLabel) names.push(state.remoteLabel);
+  if (state.me && state.me.name && !names.some((name) => sameName(name, state.me.name))) names.push(state.me.name);
+  box.hidden = false;
+  box.replaceChildren();
+  names.forEach((name) => {
+    const tile = document.createElement("div");
+    tile.className = "live-tile";
+    tile.dataset.name = name;
+    const pic = document.createElement("span");
+    pic.className = "tile-pic";
+    const photo = document.createElement("img");
+    photo.className = "row-avatar";
+    photo.alt = "";
+    photo.hidden = true;
+    const letter = document.createElement("span");
+    letter.className = "tile-letter";
+    letter.textContent = (name || "?").slice(0, 1).toUpperCase();
+    pic.append(photo, letter);
+    bindAvatar(photo, letter, name);
+    const label = document.createElement("small");
+    label.textContent = name;
+    tile.append(pic, label);
+    box.append(tile);
+  });
+}
+
 function showLiveUI() {
+  const stage = document.querySelector(".stage");
+  if (stage) stage.classList.add("in-call");
+  if (els.thread) els.thread.hidden = false;
+  if (els.welcome) els.welcome.hidden = true;
   els.live.hidden = false;
   els.call.disabled = true;
   const people = $("live-people");
+  if (people) people.hidden = false;
   if (state.groupCall) {
-    if (people) people.hidden = false;
-    setStatus(`Chiamata di gruppo · ${state.groupCall.name || "Gruppo"}`);
+    setStatus(state.groupCall.name || "Gruppo");
     paintLivePeople();
   } else {
-    if (people) people.hidden = true;
-    setStatus(`In chiamata con ${state.remoteLabel}`);
+    setStatus(state.remoteLabel || "In chiamata");
+    paintDirectCall();
   }
   updateToggles();
+  later(() => {
+    if (els.messages) els.messages.scrollTop = els.messages.scrollHeight;
+  }, 60);
 }
 
 function showIdleUI() {
   els.call.disabled = false;
-  if (state.phase === "idle") els.live.hidden = true;
+  if (state.phase === "idle") {
+    els.live.hidden = true;
+    const stage = document.querySelector(".stage");
+    if (stage) stage.classList.remove("in-call");
+  }
   updateToggles();
 }
 
@@ -1193,9 +1304,20 @@ function hideRemoteVideo() {
   els.remoteVideo.hidden = true;
 }
 
+function streamLevel() {
+  return clampNum(state.settings.streamVolume, 0, 100, 100) / 100;
+}
+
+function applyStreamVolume() {
+  const volume = streamLevel();
+  if (els.remoteVideo) els.remoteVideo.volume = volume;
+  document.querySelectorAll(".live-tile video").forEach((video) => { video.volume = volume; });
+}
+
 function showRemoteVideo(stream) {
   els.remoteVideo.srcObject = stream;
   els.remoteVideo.hidden = false;
+  els.remoteVideo.volume = streamLevel();
   const play = els.remoteVideo.play();
   if (play) play.catch(() => {});
 }
@@ -1228,6 +1350,9 @@ function endCall(message, notify) {
   stopRing();
   clearTimers();
   els.incoming.hidden = true;
+  if (window.SolaxNative && window.SolaxNative.cancelCall) {
+    try { window.SolaxNative.cancelCall(); } catch (e) { /* skip */ }
+  }
   if (notify !== false && wasBusy && link) {
     try { link.send({ t: "hangup" }); } catch (e) { /* already gone */ }
   }
@@ -1347,11 +1472,11 @@ async function publishVideo(stream, kind) {
   await stopExtra(false);
   const track = stream.getVideoTracks()[0];
   if (track) track.contentHint = kind === "screen" ? "detail" : "motion";
-  if (state.settings.showPreview !== false || kind === "screen") {
-    els.localVideo.srcObject = stream;
-    els.localVideo.hidden = false;
-    els.localVideo.classList.toggle("mirror", kind === "camera");
-  }
+  els.localVideo.srcObject = stream;
+  els.localVideo.hidden = false;
+  els.localVideo.classList.toggle("mirror", kind === "camera");
+  const localPlay = els.localVideo.play();
+  if (localPlay) localPlay.catch(() => {});
   state.camOn = kind === "camera";
   state.screenOn = kind === "screen";
   updateToggles();
@@ -1426,12 +1551,12 @@ async function toggleCamera() {
 async function toggleScreen() {
   if (state.phase !== "live") return;
   if (state.screenOn) { await stopExtra(true); return; }
-  const surface = await chooseShareSurface();
-  if (!surface) return;
-  if (window.SolaxIOS && !(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) {
-    setStatus("Su iPhone non si può condividere lo schermo. Voce, camera e chat sì.");
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    setStatus("Su iPhone non si può condividere lo schermo. Voce e chat funzionano.");
     return;
   }
+  const surface = await chooseShareSurface();
+  if (!surface) return;
   const fps = clampNum(state.settings.screenFps, 30, 160, 30);
   const size = frameSize(state.settings.screenRes);
   try {
@@ -1480,7 +1605,7 @@ async function grabDisplay(surface, fps, size) {
   };
   const options = {
     video,
-    audio: false,
+    audio: true,
     monitorTypeSurfaces: surface === "window" ? "exclude" : "include",
     selfBrowserSurface: "exclude",
     surfaceSwitching: "include",
@@ -1512,10 +1637,26 @@ function linkIsNoise(link) {
   return !!(meta.file || meta.avatar);
 }
 
+function phoneCallAlert(label) {
+  if (!phoneLayout()) return;
+  const who = String(label || "Qualcuno");
+  const native = window.SolaxNative;
+  if (native && native.notifyCall) {
+    try { native.notifyCall(who); } catch (e) { /* banner stays */ }
+  }
+  try {
+    if (typeof Notification === "function" && Notification.permission === "granted") {
+      new Notification("SolaxRD", { body: `${who} ti sta chiamando` });
+    }
+  } catch (e) { /* in-app banner stays */ }
+}
+
 function showIncoming(label) {
   els.incomingTitle.textContent = `${label} ti sta chiamando`;
   els.incoming.hidden = false;
   els.hangup.disabled = false;
+  phoneCallAlert(label);
+  unlockAudio();
 }
 
 function whenOpen(link, ms) {
@@ -1656,13 +1797,31 @@ function attachLink(link) {
   });
 }
 
+let peerBoot = 0;
+
+function softRestartPeer(delayMs) {
+  if (state.loggingOut) return;
+  const boot = ++peerBoot;
+  state.peerReady = false;
+  const old = state.peer;
+  state.peer = null;
+  try { if (old && !old.destroyed) old.destroy(); } catch (e) { /* already gone */ }
+  els.net.textContent = "Riconnessione…";
+  later(() => {
+    if (boot !== peerBoot || state.loggingOut || state.peer) return;
+    startPeer();
+  }, Math.max(400, delayMs || 1000));
+}
+
 function startPeer() {
   if (!window.Peer) {
     els.net.textContent = "Chiamate non disponibili";
     return;
   }
+  if (!state.me || !state.me.peerId) return;
   state.loggingOut = false;
   state.peerReady = false;
+  const boot = ++peerBoot;
   const peer = new Peer(state.me.peerId, {
     secure: true,
     config: {
@@ -1680,6 +1839,7 @@ function startPeer() {
   });
   state.peer = peer;
   peer.on("open", () => {
+    if (boot !== peerBoot || state.peer !== peer) return;
     state.peerReady = true;
     state.retries = 0;
     els.net.textContent = "In linea";
@@ -1687,19 +1847,42 @@ function startPeer() {
   });
   peer.on("disconnected", () => {
     state.peerReady = false;
-    if (state.loggingOut || !state.peer || state.peer.destroyed) return;
+    if (state.loggingOut || state.peer !== peer || peer.destroyed) return;
     state.retries += 1;
-    if (state.retries > 6) { els.net.textContent = "Offline"; return; }
     els.net.textContent = "Riconnessione…";
-    later(() => { try { peer.reconnect(); } catch (e) { /* retry later */ } }, 1500 * state.retries);
+    if (state.retries > 3) {
+      softRestartPeer(1200 + state.retries * 400);
+      state.retries = 0;
+      return;
+    }
+    later(() => {
+      if (boot !== peerBoot || state.peer !== peer || peer.destroyed || state.loggingOut) return;
+      try { peer.reconnect(); } catch (e) { softRestartPeer(1500); }
+    }, 1200 * state.retries);
+  });
+  peer.on("close", () => {
+    if (state.loggingOut || state.peer !== peer) return;
+    state.peerReady = false;
+    softRestartPeer(1500);
   });
   peer.on("error", (err) => {
+    if (state.loggingOut || state.peer !== peer) return;
     const type = err && err.type;
     if (type === "peer-unavailable") {
       /* first lookup is often empty; outgoing calls retry instead of hanging up */
     }
-    else if (type === "unavailable-id") els.net.textContent = "Account già aperto";
-    else if (type === "network" || type === "server-error" || type === "socket-error") els.net.textContent = "Connessione assente";
+    else if (type === "unavailable-id") {
+      /* dopo un aggiornamento l’ID resta occupato qualche secondo */
+      els.net.textContent = "Riconnessione…";
+      softRestartPeer(2800);
+    }
+    else if (type === "network" || type === "server-error" || type === "socket-error" || type === "socket-closed") {
+      els.net.textContent = "Riconnessione…";
+      later(() => {
+        if (boot !== peerBoot || state.peerReady || state.loggingOut) return;
+        softRestartPeer(1600);
+      }, 2000);
+    }
   });
   peer.on("connection", (link) => {
     attachLink(link);
@@ -1791,6 +1974,7 @@ function startPeer() {
 
 function destroyPeer() {
   state.loggingOut = true;
+  peerBoot += 1;
   state.peerReady = false;
   endCall("", false);
   stopMic();
@@ -1886,15 +2070,38 @@ function avatarSrc(name) {
   return `/api/avatar/friend?name=${encodeURIComponent(name)}&t=${tick}`;
 }
 
+const avatarUrls = new Map();
+
 function bindAvatar(img, letter, name) {
   if (!img || !name) return;
+  const ticket = String(state.avatarTick || 1);
   img.dataset.avatar = name;
   img.alt = "";
   img.hidden = true;
   if (letter) letter.hidden = false;
-  img.onload = () => { img.hidden = false; if (letter) letter.hidden = true; };
-  img.onerror = () => { img.hidden = true; if (letter) letter.hidden = false; };
-  img.src = avatarSrc(name);
+  const key = name.toLocaleLowerCase("it") + ":" + ticket;
+  const show = (url) => {
+    if (img.dataset.avatar !== name || String(state.avatarTick || 1) !== ticket) return;
+    img.onload = () => { img.hidden = false; if (letter) letter.hidden = true; };
+    img.onerror = () => { img.hidden = true; if (letter) letter.hidden = false; };
+    img.src = url;
+  };
+  const cached = avatarUrls.get(key);
+  if (cached) { show(cached); return; }
+  fetch(avatarSrc(name)).then((res) => {
+    if (!res.ok) throw new Error("missing");
+    return res.blob();
+  }).then((blob) => {
+    if (!blob || !blob.size) throw new Error("empty");
+    const url = URL.createObjectURL(blob);
+    avatarUrls.set(key, url);
+    show(url);
+  }).catch(() => {
+    if (img.dataset.avatar === name) {
+      img.hidden = true;
+      if (letter) letter.hidden = false;
+    }
+  });
 }
 
 function bumpAvatars() {
@@ -1952,7 +2159,8 @@ function rememberGroupPeer(peerId, extra) {
 function paintLivePeople() {
   const box = $("live-people");
   if (!box || !state.groupCall) return;
-  const names = (state.groupCall.members || []).filter((name) => !sameName(name, state.me && state.me.name));
+  const names = (state.groupCall.members || []).slice();
+  if (state.me && !names.some((name) => sameName(name, state.me.name))) names.unshift(state.me.name);
   box.hidden = false;
   const seen = new Set();
   [...box.children].forEach((node) => {
@@ -2018,6 +2226,7 @@ function attachGroupStream(peerId, name, stream) {
       if (video && hasVideo) {
         video.srcObject = stream;
         video.hidden = false;
+        video.volume = streamLevel();
         const go = video.play();
         if (go) go.catch(() => {});
       }
@@ -2148,6 +2357,7 @@ function beginIncomingGroup(link, msg) {
   };
   els.incomingTitle.textContent = `${cleanLabel(msg.name)} ti chiama nel gruppo ${msg.gname || "Gruppo"}`;
   els.incoming.hidden = false;
+  phoneCallAlert(cleanLabel(msg.name));
   els.hangup.disabled = false;
   startRing();
   later(() => {
@@ -2488,7 +2698,7 @@ async function syncNow() {
   if (data && data.ok) {
     if (!Array.isArray(state.chats)) state.chats = [];
     const previousChats = state.chats;
-    const previous = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last]));
+    const previous = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last, chat.at]));
     state.chats = Array.isArray(data.chats) ? data.chats : state.chats;
     if (state.activeKind !== "group") {
       if (data.reload && els.messages) {
@@ -2504,7 +2714,7 @@ async function syncNow() {
       if (data.rev) state.rev = data.rev;
     }
     noteRows(previousChats, state.chats, "dm");
-    const next = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last]));
+    const next = JSON.stringify(state.chats.map((chat) => [chat.name, chat.unread, chat.last, chat.at]));
     if (previous !== next) renderChats();
   }
   if (groups && groups.ok) {
@@ -2542,17 +2752,21 @@ async function checkUpdate() {
   const data = await api("/api/update");
   const local = Number(data.local);
   const shown = Number.isFinite(local) ? local : 0;
-  if (els.version) els.version.textContent = `Versione ${shown}`;
+  if (els.version) els.version.textContent = RELEASE_NAME;
   let pending = !!(data && data.update);
   if (pending && document.body.classList.contains("android") && window.SolaxNative && window.SolaxNative.load) {
     const skipped = Number(window.SolaxNative.load("skip-aver") || 0) || 0;
     if (skipped >= Number(data.remote || 0)) pending = false;
   }
-  if ($("update-title") && data.remote && pending) $("update-title").textContent = `Versione ${data.remote}`;
+  if ($("update-title") && pending) $("update-title").textContent = RELEASE_NAME;
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
-      ? `C’è la versione ${data.remote}. Premi Installa ora e conferma l’installazione sul telefono.`
-      : `La ${shown} lascia il posto alla ${data.remote}. Premi Installa ora: SolaxRD si chiude e si riapre nuovo.`;
+      ? "C’è una versione nuova. Riscarica l’APK dal sito."
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.2.";
+  }
+  if (document.body.classList.contains("android")) {
+    if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
+    if ($("update-chip")) $("update-chip").textContent = "Riscarica APK";
   }
   const ready = pending;
   if (!ready) {
@@ -2573,8 +2787,27 @@ async function checkUpdate() {
   showUpdateChip(false);
 }
 
+function openUpdateSite() {
+  const url = "https://sisoseller.github.io/solaxrd/";
+  try {
+    if (window.SolaxNative && window.SolaxNative.openUrl) {
+      window.SolaxNative.openUrl(url);
+      return;
+    }
+  } catch (e) { /* browser fallback */ }
+  window.open(url, "_blank", "noopener");
+}
+
 async function installUpdate() {
   if (state.updating) return;
+  if (document.body.classList.contains("android")) {
+    openUpdateSite();
+    state.updateSnooze = true;
+    if (els.update) els.update.hidden = true;
+    showUpdateChip(true);
+    if ($("update-chip")) $("update-chip").textContent = "Riscarica APK";
+    return;
+  }
   state.updating = true;
   state.updateSnooze = false;
   showUpdateChip(false);
@@ -2590,9 +2823,7 @@ async function installUpdate() {
     button.textContent = "Installo…";
   }
   if (copy) {
-    copy.textContent = document.body.classList.contains("android")
-      ? "Scarico l’aggiornamento. Tra poco Android chiede di installarlo."
-      : "Scarico la nuova versione. Tra poco SolaxRD si chiude e si riapre da solo.";
+    copy.textContent = "Scarico la nuova versione. Tra poco SolaxRD si chiude e si riapre da solo.";
   }
   const applied = await api("/api/update/apply", {});
   if (applied.ok) {
@@ -2742,7 +2973,21 @@ function bindSettings() {
   bindNumber("set-screen-fps", "screenFps", 30, 160, 30);
   bindNumber("set-screen-res", "screenRes", 360, 1440, 720);
   bindChange("set-mic-vol", async () => { state.settings.micVolume = Number($("set-mic-vol").value); await persist(); });
-  bindChange("set-out-vol", async () => { state.settings.outputVolume = Number($("set-out-vol").value); await persist(); });
+  bindChange("set-out-vol", async () => { state.settings.outputVolume = Number($("set-out-vol").value); await persist(); applyOutputVolume(); });
+  bindChange("set-stream-vol", async () => { state.settings.streamVolume = Number($("set-stream-vol").value); await persist(); applyStreamVolume(); });
+  const syncStream = (value) => {
+    state.settings.streamVolume = Number(value);
+    const box = $("set-stream-vol");
+    const live = $("stream-vol");
+    if (box) box.value = String(state.settings.streamVolume);
+    if (live) live.value = String(state.settings.streamVolume);
+    applyStreamVolume();
+    persistSoon();
+  };
+  if ($("set-stream-vol")) $("set-stream-vol").addEventListener("input", () => syncStream($("set-stream-vol").value));
+  if ($("stream-vol")) $("stream-vol").addEventListener("input", () => syncStream($("stream-vol").value));
+  const reask = $("reask-media");
+  if (reask) reask.addEventListener("click", () => { reaskMedia().catch(() => {}); });
   if ($("set-mic-vol")) $("set-mic-vol").addEventListener("input", () => {
     state.settings.micVolume = Number($("set-mic-vol").value);
     persistSoon();
@@ -2880,7 +3125,7 @@ async function loadAvatar() {
 
 async function saveAvatar(file) {
   const image = await createImageBitmap(file);
-  const size = 160;
+  const size = 96;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
@@ -2889,7 +3134,12 @@ async function saveAvatar(file) {
   const width = image.width * scale;
   const height = image.height * scale;
   ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  let blob = null;
+  for (const quality of [0.72, 0.58, 0.42, 0.28]) {
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size <= 12000) break;
+  }
+  if (!blob || blob.size > 28000) { els.listError.textContent = "Foto non salvata."; return; }
   const res = await fetch("/api/avatar", { method: "POST", body: blob });
   const data = await res.json();
   if (!data.ok) { els.listError.textContent = data.error || "Foto non salvata."; return; }
@@ -3002,6 +3252,7 @@ async function refreshThread() {
 async function sendFile(file) {
   if (!state.active) { els.listError.textContent = "Apri prima una chat."; return; }
   if (file.size > 2 * 1024 * 1024 * 1024) { els.listError.textContent = "Il file può arrivare fino a 2 GB."; return; }
+  const isPhoto = isImageFile(file.name, file.type);
   const preview = await makePreview(file);
   const row = addBubble({
     mine: true,
@@ -3012,7 +3263,7 @@ async function sendFile(file) {
     preview: preview.url,
     at: Math.floor(Date.now() / 1000),
   });
-  els.listError.textContent = "Invio file…";
+  els.listError.textContent = isPhoto ? "Invio foto…" : "Invio file…";
   const started = state.activeKind === "group"
     ? await api("/api/groups/files/start", {
       id: state.active,
@@ -3040,6 +3291,17 @@ async function sendFile(file) {
     if (started.message.n) state.seen.add(String(started.message.n));
     if (started.id && preview.url) rememberPreview(started.id, preview.url);
   }
+  let cloudOk = false;
+  if (started.id && preview.cloud) {
+    try {
+      const posted = await fetch(`/api/files/preview?id=${encodeURIComponent(started.id)}`, { method: "POST", body: preview.cloud });
+      const info = await posted.json().catch(() => ({}));
+      if (info && info.ok) {
+        cloudOk = true;
+        if (info.url) rememberPreview(started.id, info.url);
+      }
+    } catch (e) { /* peer delivery still tried */ }
+  }
   const chunk = 256 * 1024;
   for (let offset = 0; offset < file.size; offset += chunk) {
     const part = file.slice(offset, Math.min(file.size, offset + chunk));
@@ -3049,8 +3311,12 @@ async function sendFile(file) {
   }
   els.listError.textContent = "";
   if (started.id) revealFile(started.id);
-  deliverFile(started.id, file, preview.data).catch(() => {
-    els.listError.textContent = "File salvato. L’amico lo riceve quando ha SolaxRD aperto.";
+  deliverFile(started.id, file, preview.data).then(() => {
+    els.listError.textContent = "";
+  }).catch(() => {
+    if (cloudOk && isPhoto) els.listError.textContent = "";
+    else if (isPhoto) els.listError.textContent = "Foto inviata. L’amico la vede appena riapre SolaxRD.";
+    else els.listError.textContent = "File inviato. L’amico lo riceve quando riapre SolaxRD.";
   });
 }
 
@@ -3255,6 +3521,13 @@ async function leaveOrDeleteGroup(kind) {
 if ($("leave-group")) $("leave-group").addEventListener("click", () => leaveOrDeleteGroup("leave"));
 if ($("delete-group")) $("delete-group").addEventListener("click", () => leaveOrDeleteGroup("delete"));
 $("me-btn").addEventListener("click", () => setView("settings"));
+const peopleToggle = $("people-toggle");
+if (peopleToggle) peopleToggle.addEventListener("click", () => {
+  const pane = $("people");
+  const open = !!(pane && pane.hidden);
+  showPeople(open);
+  peopleToggle.textContent = open ? "⌃" : "⌄";
+});
 els.openForm.addEventListener("submit", (event) => { event.preventDefault(); openChat(els.openName.value); });
 els.composer.addEventListener("submit", (event) => { event.preventDefault(); sendMessage(els.composerText.value); });
 els.composerText.addEventListener("input", () => { els.composerCount.textContent = `${els.composerText.value.length}/80`; });
@@ -3345,14 +3618,18 @@ async function boot() {
     state.settings = takeSettings(data.settings);
     applyLocal();
     setTheme(state.settings.theme || "dark");
-    if (data && data.session) await enterApp({ ...data.session, settings: data.settings });
-    else {
-      showAuth();
-      if (els.username) els.username.focus();
-    }
+    revealShell(async () => {
+      if (data && data.session) await enterApp({ ...data.session, settings: data.settings });
+      else {
+        showAuth();
+        if (els.username) els.username.focus();
+      }
+    });
   } catch (e) {
-    showAuth();
-    if (els.authError) els.authError.textContent = "SolaxRD non risponde.";
+    revealShell(() => {
+      showAuth();
+      if (els.authError) els.authError.textContent = "SolaxRD non risponde.";
+    });
   }
 }
 

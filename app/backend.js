@@ -1327,7 +1327,28 @@
       }
       if (path === "/api/files/get") {
         const id = query.get("id") || "";
-        const b64 = N.readFile("f-" + id);
+        let b64 = N.readFile("f-" + id);
+        if (!b64) {
+          const got = await readPreview(id);
+          if (got.url && N.downloadUrl) {
+            b64 = String(N.downloadUrl(got.url) || "");
+            if (b64) N.writeFile("f-" + id, b64);
+          } else if (got.bytes && got.bytes.length) {
+            b64 = b64FromBytes(got.bytes);
+            N.writeFile("f-" + id, b64);
+          } else if (got.url) {
+            try {
+              const remote = await nativeFetch(got.url);
+              if (remote.ok) {
+                const bytes = new Uint8Array(await remote.arrayBuffer());
+                if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) {
+                  b64 = b64FromBytes(bytes);
+                  N.writeFile("f-" + id, b64);
+                }
+              }
+            } catch (e) { /* preview url still used in UI */ }
+          }
+        }
         if (!b64) return binResponse(new Uint8Array(), "text/plain", 404);
         const bytes = bytesFromB64(b64);
         let mime = "application/octet-stream";
