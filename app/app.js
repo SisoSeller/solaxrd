@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.8";
+const RELEASE_NAME = "1.0.9";
 const bootAt = Date.now();
 
 const els = {
@@ -1430,11 +1430,23 @@ function bindVoice(call) {
   });
   call.on("close", () => {
     if (state.voice !== call) return;
-    if (state.phase === "live") endCall("Chiamata chiusa.", false);
+    // Piccoli blink di PeerJS: aspetta prima di chiudere davvero.
+    later(() => {
+      if (state.voice !== call) return;
+      if (state.phase !== "live") return;
+      if (els.remoteAudio && els.remoteAudio.srcObject) return;
+      endCall("Chiamata chiusa.", false);
+    }, 2500);
   });
   call.on("error", () => {
     if (state.voice !== call) return;
-    if (state.phase === "live") endCall("Errore nella chiamata.", false);
+    if (state.phase === "live") {
+      later(() => {
+        if (state.voice !== call || state.phase !== "live") return;
+        if (els.remoteAudio && els.remoteAudio.srcObject) return;
+        endCall("Errore nella chiamata.", false);
+      }, 2500);
+    }
     else if (state.phase === "out") setStatus("Rete instabile, resto in attesa…");
   });
   const attach = () => {
@@ -1445,10 +1457,12 @@ function bindVoice(call) {
       if (state.voice !== call || state.phase !== "live") return;
       if (pc.connectionState !== "failed" && pc.connectionState !== "disconnected") return;
       later(() => {
-        if (state.voice === call && state.phase === "live" && (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed")) {
-          endCall("Connessione persa.", false);
-        }
-      }, 4000);
+        if (state.voice !== call || state.phase !== "live") return;
+        const stillBad = pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed";
+        if (!stillBad) return;
+        if (els.remoteAudio && els.remoteAudio.srcObject && pc.connectionState === "disconnected") return;
+        endCall("Connessione persa.", false);
+      }, 6000);
     };
   };
   attach();
@@ -1810,7 +1824,16 @@ function attachLink(link) {
   link.on("close", () => {
     if (linkIsNoise(link)) return;
     if (state.groupCall && state.groupCall.peers[link.peer]) return;
-    if ((state.link === link || state.incoming === link) && state.phase === "live") endCall("Chiamata chiusa.", false);
+    if ((state.link === link || state.incoming === link) && state.phase === "live") {
+      // Il canale dati PeerJS può chiudersi mentre audio/video restano vivi.
+      const mediaUp = !!(state.voice || (els.remoteAudio && els.remoteAudio.srcObject));
+      if (mediaUp) {
+        if (state.link === link) state.link = null;
+        if (state.incoming === link) state.incoming = null;
+        return;
+      }
+      endCall("Chiamata chiusa.", false);
+    }
   });
   link.on("error", () => {
     /* first PeerJS connect often errors; startCall retries and times out */
@@ -1823,6 +1846,11 @@ let peerRestartCount = 0;
 
 function softRestartPeer(delayMs) {
   if (state.loggingOut) return;
+  if (state.phase === "live" || state.phase === "out" || state.phase === "in" || state.groupCall) {
+    // Non distruggere PeerJS a metà chiamata: la media resta attiva.
+    els.net.textContent = "Rete instabile…";
+    return;
+  }
   const now = Date.now();
   if (now - peerRestartAt < 3500) return;
   if (peerRestartCount > 12) {
@@ -1839,6 +1867,7 @@ function softRestartPeer(delayMs) {
   els.net.textContent = "Riconnessione…";
   later(() => {
     if (boot !== peerBoot || state.loggingOut || state.peer) return;
+    if (state.phase === "live" || state.phase === "out" || state.phase === "in" || state.groupCall) return;
     startPeer();
   }, Math.max(400, delayMs || 1000));
 }
@@ -2823,7 +2852,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.8.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.9.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
