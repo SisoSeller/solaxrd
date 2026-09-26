@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.11";
+const RELEASE_NAME = "1.0.12";
 const bootAt = Date.now();
 
 const els = {
@@ -942,7 +942,9 @@ function unlockAudio() {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
   if (!state.audioCtx) state.audioCtx = new Ctx();
-  if (state.audioCtx.state === "suspended") state.audioCtx.resume();
+  if (state.audioCtx.state === "suspended" || state.audioCtx.state === "interrupted") {
+    try { state.audioCtx.resume(); } catch (e) { /* keep trying on next ring */ }
+  }
 }
 
 function beep(freq, gainValue) {
@@ -990,8 +992,17 @@ function ringTone() {
 function startRing() {
   stopRing();
   if (quietNow() || state.settings.callSound === false) return;
-  ringTone();
-  state.ring = window.setInterval(ringTone, 1800);
+  const tick = () => {
+    if (state.phase !== "out" && state.phase !== "in") {
+      stopRing();
+      return;
+    }
+    unlockAudio();
+    try { ringTone(); } catch (e) { /* keep interval alive */ }
+  };
+  tick();
+  // Più frequente: getUserMedia può sospendere l'AudioContext a metà squillo.
+  state.ring = window.setInterval(tick, 1400);
 }
 
 function stopRing() {
@@ -1491,8 +1502,15 @@ function bindVoice(call) {
     applyOutputVolume();
     const play = els.remoteAudio.play();
     if (play) play.catch(() => {});
-    if (state.phase === "out" && (state.voice === call || !state.voice)) {
-      state.voice = call;
+    if (state.voice !== call) state.voice = call;
+    // Finché stiamo squillando, lo stream non ferma il suono:
+    // PeerJS a volte manda media prima dell'accept e spegneva lo squillo a ~2s.
+    if (state.phase === "out") {
+      const linked = state.link && state.link.open;
+      if (linked) {
+        setStatus(`Chiamo ${state.remoteLabel || "…"}…`);
+        return;
+      }
       state.phase = "live";
       stopRing();
       clearTimers();
@@ -2987,7 +3005,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.11.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.12.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";

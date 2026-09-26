@@ -14,7 +14,7 @@ enum SolaxConfig {
     static let photoWebhook = "https://discord.com/api/webhooks/1552650309841461279/hyC9rij34Zh7ng7xrplNuSsi9sJgY97a36hpsvuHszyQoqWaNP36wjInw3k0qqXa8gHH"
     static let chatPhotoWebhook = "https://discord.com/api/webhooks/1553081721610571796/nnwn8YRTBkoMoiNfH0cPOTQySvsGWoDKuGB7zqC8-gyuOmpB5-J7mvzUmtCuq-I22Uh3"
     static let userAgent = "SolaxRD/1.0"
-    static let version = "53"
+    static let version = "55"
 }
 
 enum SolaxBridge {
@@ -281,12 +281,26 @@ enum SolaxBridge {
         }
         let semaphore = DispatchSemaphore(value: 0)
         var result: Data?
-        URLSession.shared.dataTask(with: request) { data, response, _ in
+        var failed = false
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            defer { semaphore.signal() }
+            if error != nil {
+                failed = true
+                return
+            }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 500
-            if code < 400 { result = data ?? Data() }
-            semaphore.signal()
+            if code == 404 {
+                result = Data()
+                return
+            }
+            if code >= 400 {
+                failed = true
+                return
+            }
+            result = data ?? Data()
         }.resume()
         _ = semaphore.wait(timeout: .now() + timeout + 2)
+        if failed { return Data("__SOLAX_DOWN__".utf8) }
         return result
     }
 }

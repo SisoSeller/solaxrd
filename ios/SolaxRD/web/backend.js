@@ -69,12 +69,23 @@
     return text;
   }
 
+  let kvDown = false;
+
   function kvGet(key) {
-    return plain(N.kvGet(key));
+    const raw = String(N.kvGet(key) || "");
+    if (raw === "__SOLAX_DOWN__") {
+      kvDown = true;
+      return null;
+    }
+    return plain(raw);
   }
 
   function kvSet(key, value) {
     const body = String(N.kvSet(key, value) || "");
+    if (body === "__SOLAX_DOWN__") {
+      kvDown = true;
+      return false;
+    }
     return body.toLowerCase().indexOf("true") >= 0;
   }
 
@@ -262,12 +273,32 @@
   }
 
   function fetchRecord(key) {
-    const nameToken = kvGet(key + "n");
-    if (!nameToken) return null;
+    kvDown = false;
+    let nameToken = kvGet(key + "n");
+    if (kvDown) return { down: true };
+    if (!nameToken) {
+      kvDown = false;
+      nameToken = kvGet(key + "n");
+      if (kvDown) return { down: true };
+      if (!nameToken) return null;
+    }
     try {
       const name = dec.decode(urlB64Decode(nameToken));
-      const salt = urlB64Decode(kvGet(key + "s") || "");
-      const digest = urlB64Decode(kvGet(key + "h") || "");
+      kvDown = false;
+      let saltTok = kvGet(key + "s");
+      if (kvDown) return { down: true };
+      let hashTok = kvGet(key + "h");
+      if (kvDown) return { down: true };
+      if (!saltTok || !hashTok) {
+        kvDown = false;
+        saltTok = saltTok || kvGet(key + "s");
+        if (kvDown) return { down: true };
+        hashTok = hashTok || kvGet(key + "h");
+        if (kvDown) return { down: true };
+        if (!saltTok || !hashTok) return { down: true };
+      }
+      const salt = urlB64Decode(saltTok || "");
+      const digest = urlB64Decode(hashTok || "");
       if (!name || salt.length !== 16 || digest.length !== 32) return null;
       const [display, err] = parseName(name);
       if (err || display !== name) return null;
@@ -280,6 +311,10 @@
     } catch (e) {
       return null;
     }
+  }
+
+  function accountRec(rec) {
+    return rec && !rec.down ? rec : null;
   }
 
   function putRecord(key, rec) {
@@ -504,8 +539,21 @@
     if (nameError) return { ok: false, error: nameError };
     const passwordError = parsePassword(password);
     if (passwordError) return { ok: false, error: passwordError };
-    const rec = fetchRecord(userKey(display));
-    if (!rec || !verifyPassword(password, rec)) return { ok: false, error: "Nome o password non validi." };
+    let rec = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      rec = fetchRecord(userKey(display));
+      if (rec && rec.down) {
+        if (attempt === 2) return { ok: false, error: "Sei offline. Su un dispositivo nuovo serve internet." };
+        continue;
+      }
+      break;
+    }
+    if (rec && rec.down) {
+      return { ok: false, error: "Sei offline. Su un dispositivo nuovo serve internet." };
+    }
+    if (!(rec && !rec.down) || !verifyPassword(password, rec)) {
+      return { ok: false, error: kvDown ? "Sei offline. Su un dispositivo nuovo serve internet." : "Nome o password non validi." };
+    }
     saveSession(rec.name);
     return okUser(rec.name);
   }
