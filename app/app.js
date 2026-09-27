@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.12";
+const RELEASE_NAME = "1.0.13";
 const bootAt = Date.now();
 
 const els = {
@@ -965,49 +965,79 @@ function beep(freq, gainValue) {
   osc.stop(ctx.currentTime + 0.24);
 }
 
-function ringTone() {
-  unlockAudio();
-  const ctx = state.audioCtx;
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  const play = (freq, start, stop, volume) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "square";
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, now + start);
-    gain.gain.exponentialRampToValueAtTime(volume, now + start + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + stop);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now + start);
-    osc.stop(now + stop + 0.02);
+function ringFile() {
+  if (state.ringUrl) return state.ringUrl;
+  const rate = 22050;
+  const seconds = 2;
+  const count = rate * seconds;
+  const pcm = new Int16Array(count);
+  for (let i = 0; i < count; i += 1) {
+    const t = i / rate;
+    let amp = 0;
+    if (t < 0.38) amp = Math.sin(Math.PI * (t / 0.38));
+    else if (t > 0.48 && t < 0.9) amp = Math.sin(Math.PI * ((t - 0.48) / 0.42));
+    const tone = Math.sin(2 * Math.PI * (t < 0.48 ? 440 : 494) * t);
+    pcm[i] = Math.max(-32767, Math.min(32767, Math.round(tone * amp * 14000)));
+  }
+  const buffer = new ArrayBuffer(44 + pcm.length * 2);
+  const view = new DataView(buffer);
+  const text = (offset, value) => {
+    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i));
   };
-  play(523, 0, 0.34, 0.72);
-  play(659, 0.1, 0.44, 0.68);
-  play(523, 0.48, 0.82, 0.72);
-  play(659, 0.58, 0.92, 0.68);
+  text(0, "RIFF");
+  view.setUint32(4, 36 + pcm.length * 2, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  text(36, "data");
+  view.setUint32(40, pcm.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < pcm.length; i += 1) {
+    view.setInt16(offset, pcm[i], true);
+    offset += 2;
+  }
+  state.ringUrl = URL.createObjectURL(new Blob([buffer], { type: "audio/wav" }));
+  return state.ringUrl;
 }
 
 function startRing() {
   stopRing();
   if (quietNow() || state.settings.callSound === false) return;
-  const tick = () => {
-    if (state.phase !== "out" && state.phase !== "in") {
-      stopRing();
-      return;
+  // Il microfono già acceso fa spegnere lo squillo dopo ~2s (Windows lo copre).
+  if (!state.voice) stopMic();
+  const audio = state.ringAudio || (state.ringAudio = new Audio());
+  audio.src = ringFile();
+  audio.loop = true;
+  audio.volume = 0.9;
+  state.ringing = true;
+  const play = audio.play();
+  if (play) play.catch(() => {});
+  state.ring = window.setInterval(() => {
+    if (!state.ringing) return;
+    if (state.phase !== "out" && state.phase !== "in") return;
+    if (audio.paused) {
+      const again = audio.play();
+      if (again) again.catch(() => {});
     }
-    unlockAudio();
-    try { ringTone(); } catch (e) { /* keep interval alive */ }
-  };
-  tick();
-  // Più frequente: getUserMedia può sospendere l'AudioContext a metà squillo.
-  state.ring = window.setInterval(tick, 1400);
+  }, 800);
 }
 
 function stopRing() {
+  state.ringing = false;
   if (state.ring) window.clearInterval(state.ring);
   state.ring = 0;
+  if (state.ringAudio) {
+    try {
+      state.ringAudio.pause();
+      state.ringAudio.currentTime = 0;
+    } catch (e) { /* already stopped */ }
+  }
 }
 
 function later(fn, ms) {
@@ -1216,6 +1246,11 @@ function warmMic() {
   if (state.micWarm || !navigator.mediaDevices) return;
   state.micWarm = true;
   ensureMic().then(() => {
+    if (state.ringing || state.phase === "out" || state.phase === "in") {
+      stopMic();
+      state.micWarm = false;
+      return;
+    }
     if (state.phase === "idle") hushMic();
   }).catch(() => {
     state.micWarm = false;
@@ -1503,19 +1538,12 @@ function bindVoice(call) {
     const play = els.remoteAudio.play();
     if (play) play.catch(() => {});
     if (state.voice !== call) state.voice = call;
-    // Finché stiamo squillando, lo stream non ferma il suono:
-    // PeerJS a volte manda media prima dell'accept e spegneva lo squillo a ~2s.
+    // Lo squillo resta finché l'altro preme Accetta. Il media da solo non lo spegne.
     if (state.phase === "out") {
-      const linked = state.link && state.link.open;
-      if (linked) {
-        setStatus(`Chiamo ${state.remoteLabel || "…"}…`);
-        return;
-      }
-      state.phase = "live";
-      stopRing();
-      clearTimers();
-      showLiveUI();
-    } else if (state.phase === "live") {
+      setStatus(`Chiamo ${state.remoteLabel || "…"}…`);
+      return;
+    }
+    if (state.phase === "live") {
       showLiveUI();
     }
     paintDirectCall();
@@ -1928,7 +1956,20 @@ function attachLink(link) {
         dropGroupPeer(link.peer);
         return;
       }
-      if (msg.t === "accept") return;
+      if (msg.t === "accept") {
+        const peer = state.groupCall.peers[link.peer];
+        stopRing();
+        state.phase = "live";
+        showLiveUI();
+        const who = (peer && peer.name) || "";
+        if (shouldCallMember(who)) {
+          ensureMic().then((stream) => {
+            if (!state.groupCall || !micLive(stream)) return;
+            placeGroupVoice(link.peer, who, stream);
+          }).catch(() => {});
+        }
+        return;
+      }
     }
     if (state.link === link || state.incoming === link) onSignal(msg);
   });
@@ -2543,10 +2584,6 @@ async function ringGroupMember(name) {
       gname: state.groupCall.name,
     });
   } catch (e) { /* voice may still go */ }
-  if (shouldCallMember(data.name)) {
-    const stream = await ensureMic().catch(() => null);
-    if (micLive(stream) && state.groupCall) await placeGroupVoice(data.peerId, data.name, stream);
-  }
 }
 
 function joinGroupRoom(remote, starter) {
@@ -2607,7 +2644,6 @@ async function startGroupCall() {
     return;
   }
   unlockAudio();
-  warmMic();
   if (state.settings.confirmCall && !window.confirm(`Chiamare il gruppo ${state.group.name}?`)) return;
   if (state.phase !== "idle") return;
   state.phase = "out";
@@ -2624,17 +2660,10 @@ async function startGroupCall() {
     endCall("Non sei in linea. Aspetta 'In linea' in alto.");
     return;
   }
-  const stream = await ensureMic().catch(() => null);
-  if (!micLive(stream)) {
-    endCall("Microfono non disponibile.");
-    return;
-  }
-  state.phase = "live";
-  stopRing();
   showLiveUI();
   meshGroup().catch(() => {});
   later(() => {
-    if (state.groupCall && state.phase === "live" && !Object.keys(state.groupCall.peers || {}).length) {
+    if (state.groupCall && state.phase === "out" && !Object.keys(state.groupCall.peers || {}).length) {
       setStatus("Nessuno ha risposto ancora. Resta in attesa…");
     }
   }, 12000);
@@ -2681,7 +2710,6 @@ async function acceptGroupCall() {
 async function startCall(rawName) {
   if (state.phase !== "idle") return;
   unlockAudio();
-  warmMic();
   if (state.settings.confirmCall && !window.confirm(`Chiamare ${rawName}?`)) return;
   if (state.phase !== "idle") return;
   state.phase = "out";
@@ -2692,7 +2720,6 @@ async function startCall(rawName) {
   els.hangup.disabled = false;
   els.call.disabled = true;
   try { startRing(); } catch (e) { /* ring is optional */ }
-  const micTask = ensureMic();
   try {
     const data = await api("/api/peer", { name: rawName });
     if (state.phase !== "out") return;
@@ -2714,7 +2741,6 @@ async function startCall(rawName) {
       endCall("Non sei in linea. Aspetta 'In linea' in alto.");
       return;
     }
-    placeVoiceSoon(data.peerId, micTask);
     const link = await connectAndRing(data.peerId);
     if (state.phase !== "out") return;
     if (!state.voice && !link && !state.link) {
@@ -3005,7 +3031,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.12.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.13.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
@@ -3840,7 +3866,7 @@ els.cam.addEventListener("change", saveDevices);
 els.speaker.addEventListener("change", async () => { await saveDevices(); await applySpeaker(); });
 window.addEventListener("pointerdown", () => {
   unlockAudio();
-  if (state.me) warmMic();
+  if (state.me && state.phase === "idle" && !state.ringing) warmMic();
 }, { passive: true });
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
