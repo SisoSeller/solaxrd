@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.13";
+const RELEASE_NAME = "1.0.14";
 const bootAt = Date.now();
 
 const els = {
@@ -1074,6 +1074,24 @@ function watchRemoteHangup(message) {
   }, 7000);
 }
 
+function callHasGuest() {
+  if (mediaStillLive()) return true;
+  if (state.phase === "live") return true;
+  if (!state.groupCall) return false;
+  return Object.values(state.groupCall.peers || {}).some((peer) => {
+    const audio = peer && peer.audio && peer.audio.srcObject;
+    return !!(audio && audio.getTracks && audio.getTracks().some((track) => track.readyState === "live"));
+  });
+}
+
+function armCallWait() {
+  later(() => {
+    if (state.phase !== "out") return;
+    if (callHasGuest()) return;
+    endCall("Nessuna risposta.");
+  }, 30000);
+}
+
 function shouldIgnoreHangup() {
   if (state.groupCall) return false;
   if (state.phase === "live") {
@@ -1550,8 +1568,9 @@ function bindVoice(call) {
   });
   // PeerJS chiude spesso il MediaConnection senza che la call sia davvero finita.
   call.on("close", () => {
+    if (state.phase === "out") return;
     if (state.voice !== call) return;
-    if (state.phase !== "live" && state.phase !== "out") return;
+    if (state.phase !== "live") return;
     window.setTimeout(() => {
       if (state.voice !== call || state.phase === "idle") return;
       if (mediaStillLive()) return;
@@ -1890,6 +1909,7 @@ function onSignal(msg) {
   if (msg.t === "reject" && state.phase === "out" && !state.groupCall) endCall("Ha rifiutato.", false);
   if (msg.t === "busy" && state.phase === "out" && !state.voice && !state.groupCall) endCall("È già in chiamata.", false);
   if (msg.t === "hangup" && !state.groupCall) {
+    if (state.phase === "out") return;
     state.remoteBye = true;
     // Hangup spurii di PeerJS arrivano spesso a ~1–2s: non chiudere subito.
     if (shouldIgnoreHangup()) {
@@ -2654,19 +2674,16 @@ async function startGroupCall() {
   setStatus(`Chiamo ${state.group.name}…`);
   paintLivePeople();
   try { startRing(); } catch (e) { /* optional */ }
+  armCallWait();
   try {
     await waitReady();
   } catch (e) {
     endCall("Non sei in linea. Aspetta 'In linea' in alto.");
     return;
   }
+  if (state.phase !== "out") return;
   showLiveUI();
   meshGroup().catch(() => {});
-  later(() => {
-    if (state.groupCall && state.phase === "out" && !Object.keys(state.groupCall.peers || {}).length) {
-      setStatus("Nessuno ha risposto ancora. Resta in attesa…");
-    }
-  }, 12000);
 }
 
 async function acceptGroupCall() {
@@ -2720,36 +2737,30 @@ async function startCall(rawName) {
   els.hangup.disabled = false;
   els.call.disabled = true;
   try { startRing(); } catch (e) { /* ring is optional */ }
+  armCallWait();
+  const started = Date.now();
   try {
-    const data = await api("/api/peer", { name: rawName });
-    if (state.phase !== "out") return;
-    if (!data.ok) { endCall(data.error || "Chiamata non partita."); return; }
-    if (data.peerId === state.me.peerId) { endCall("Non puoi chiamare te stesso."); return; }
-    if (isBlocked(data.name)) { endCall("Hai bloccato questo nome."); return; }
-    await pullOnline().catch(() => {});
-    const online = onlineOf(data.name);
-    if (!online || !online.on) {
-      endCall("Non è online adesso. Deve avere SolaxRD aperto.");
-      return;
+    while (state.phase === "out" && Date.now() - started < 30000) {
+      const data = await api("/api/peer", { name: rawName });
+      if (state.phase !== "out") return;
+      if (!data.ok) { endCall(data.error || "Chiamata non partita."); return; }
+      if (data.peerId === state.me.peerId) { endCall("Non puoi chiamare te stesso."); return; }
+      if (isBlocked(data.name)) { endCall("Hai bloccato questo nome."); return; }
+      state.remoteLabel = data.name;
+      state.remotePeerId = data.peerId;
+      setStatus(`Chiamo ${data.name}…`);
+      paintDirectCall();
+      try { await waitReady(); } catch (e) { /* riprova finché non scadono i 30 secondi */ }
+      if (state.phase !== "out") return;
+      if (state.peer && !state.peer.destroyed && !state.peer.disconnected) {
+        const link = await connectAndRing(data.peerId);
+        if (state.phase !== "out") return;
+        if (link && link.open) return;
+      }
+      await sleep(1000);
     }
-    state.remoteLabel = data.name;
-    state.remotePeerId = data.peerId;
-    setStatus(`Chiamo ${data.name}…`);
-    paintDirectCall();
-    try { await waitReady(); } catch (e) { endCall("Non sei in linea. Aspetta 'In linea' in alto."); return; }
-    if (!state.peer || state.peer.disconnected || state.peer.destroyed) {
-      endCall("Non sei in linea. Aspetta 'In linea' in alto.");
-      return;
-    }
-    const link = await connectAndRing(data.peerId);
-    if (state.phase !== "out") return;
-    if (!state.voice && !link && !state.link) {
-      endCall("Non raggiungibile. Deve avere SolaxRD aperto.");
-      return;
-    }
-    later(() => { if (state.phase === "out") endCall("Nessuna risposta."); }, 25000);
   } catch (e) {
-    if (state.phase === "out") endCall("Chiamata non partita. Riprova.");
+    if (state.phase === "out") setStatus(`Chiamo ${state.remoteLabel}…`);
   }
 }
 
@@ -3031,7 +3042,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.13.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.14.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
