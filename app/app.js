@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.14";
+const RELEASE_NAME = "1.0.15";
 const bootAt = Date.now();
 
 const els = {
@@ -3042,7 +3042,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.14.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.15.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
