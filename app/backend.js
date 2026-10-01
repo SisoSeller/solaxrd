@@ -700,6 +700,7 @@
     if (head > 9999) return { ok: false, error: "Questa chat è piena." };
     if (!await kvSet("m" + id + String(head).padStart(4, "0"), packed)) return { ok: false, error: "Messaggio non inviato. Riprova." };
     await kvSet("m" + id + "h", String(head));
+    await bump(id);
     await poke(display, me.name);
     item = findChat(data, display);
     const stamp = now();
@@ -743,8 +744,11 @@
           cacheWrite(id, merged, head, rev);
           if (reload) messages = merged;
         }
-        item.seq = Math.max(Number(item.seq || 0), head);
-        item.unread = 0;
+        const arrived = (messages || []).some((row) => Number(row.n || 0) >= head) || head <= after;
+        if (arrived) {
+          item.seq = Math.max(Number(item.seq || 0), head);
+          item.unread = 0;
+        }
       }
     }
     saveDb("chats", data);
@@ -1093,6 +1097,7 @@
     const head = await headOf(id) + 1;
     if (!await kvSet("m" + id + String(head).padStart(4, "0"), packed)) return { ok: false, error: "Messaggio non inviato. Riprova." };
     await kvSet("m" + id + "h", String(head));
+    await bump(id);
     await pokeAll(gid, remote.members, me.name);
     const item = rememberGroup(data, remote, { last: text, seq: head });
     item.unread = 0;

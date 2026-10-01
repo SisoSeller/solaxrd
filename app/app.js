@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.15";
+const RELEASE_NAME = "1.0.16";
 const bootAt = Date.now();
 
 const els = {
@@ -1819,7 +1819,7 @@ function setTalk(down) {
 
 function linkIsNoise(link) {
   const meta = (link && link.metadata) || {};
-  return !!(meta.file || meta.avatar);
+  return !!(meta.file || meta.avatar || meta.solax === "chat");
 }
 
 function phoneCallAlert(label) {
@@ -1939,6 +1939,10 @@ function attachLink(link) {
       return;
     }
     if (!msg) return;
+    if (msg.t === "sync-chat") {
+      applyLiveChat(msg);
+      return;
+    }
     if (msg.t === "file-start") {
       enqueueFile({ id: msg.id });
       if (msg.preview && msg.id) rememberPreview(msg.id, msg.preview);
@@ -2893,6 +2897,68 @@ async function openGroup(gid) {
   }
 }
 
+function applyLiveChat(msg) {
+  const name = cleanLabel((msg && msg.name) || "");
+  if (!name || (state.me && sameName(name, state.me.name))) return;
+  const text = String((msg && (msg.text || msg.filename)) || "").slice(0, 80);
+  const openHere = state.view === "thread" && state.activeKind !== "group" && sameName(state.active, name);
+  if (openHere) {
+    addBubble({
+      mine: false,
+      text: (msg && msg.text) || "",
+      n: msg && msg.n,
+      at: (msg && msg.at) || Math.floor(Date.now() / 1000),
+      file: (msg && msg.file) || "",
+      filename: (msg && msg.filename) || "",
+      mime: (msg && msg.mime) || "",
+      from: name,
+    });
+    if (msg && msg.file) {
+      const img = [...els.messages.querySelectorAll("img")].find((node) => node.dataset.file === msg.file);
+      if (img) loadStoredPreview(img, msg.file);
+    }
+    if (soundsOn() && state.settings.messageSound !== false) beep(660, 0.03);
+  }
+  const chat = (state.chats || []).find((item) => sameName(item.name, name));
+  if (chat) {
+    if (text) chat.last = text;
+    chat.at = Math.floor(Date.now() / 1000);
+    if (!openHere) chat.unread = Number(chat.unread || 0) + 1;
+    renderChats();
+  } else {
+    syncNow();
+  }
+}
+
+function nudgeChat(name, extra) {
+  if (!name || !state.peer || !state.me || state.peer.destroyed) return;
+  api("/api/peer", { name }).then((who) => {
+    if (!who.ok || !state.peer || state.peer.destroyed) return;
+    let link = null;
+    try {
+      link = state.peer.connect(who.peerId, {
+        reliable: true,
+        metadata: { solax: "chat", name: state.me.name },
+      });
+    } catch (e) {
+      return;
+    }
+    if (!link) return;
+    attachLink(link);
+    const payload = Object.assign({ t: "sync-chat", name: state.me.name }, extra || {});
+    const send = () => { try { link.send(payload); } catch (e) { /* il sync lo prende lo stesso */ } };
+    if (link.open) send();
+    else link.on("open", send);
+  }).catch(() => {});
+}
+
+function nudgeActive(extra) {
+  const names = state.activeKind === "group"
+    ? ((state.group && state.group.members) || []).filter((name) => state.me && !sameName(name, state.me.name))
+    : [state.active];
+  names.forEach((name) => nudgeChat(name, extra));
+}
+
 async function sendMessage(text) {
   if (!state.active) return;
   const clean = String(text || "").replace(/\s+/g, " ").trim();
@@ -2913,6 +2979,11 @@ async function sendMessage(text) {
   if (data.chats) { state.chats = data.chats; renderChats(); }
   if (data.groups) { state.groups = data.groups; renderChats(); }
   if (data.group) { state.group = data.group; paintPeople(); }
+  nudgeActive({
+    text: clean.slice(0, 80),
+    n: data.message && data.message.n,
+    at: data.message && data.message.at,
+  });
 }
 
 function phoneNotify(title, body) {
@@ -3042,7 +3113,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.15.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.16.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
@@ -3140,16 +3211,16 @@ async function loop() {
     ticks += 1;
     try {
       await syncNow();
-      await api("/api/heartbeat", {});
-      await pullPresence();
-      await pullOnline();
-      if (ticks % 3 === 1) await pullAvatars();
-      if (ticks % 8 === 0) await checkUpdate();
+      if (ticks % 4 === 0) await api("/api/heartbeat", {});
+      if (ticks % 3 === 0) await pullPresence();
+      if (ticks % 2 === 0) await pullOnline();
+      if (ticks % 6 === 1) await pullAvatars();
+      if (ticks % 20 === 0) await checkUpdate();
     } catch (e) { /* next round */ }
     if (!state.me || state.loopGen !== gen) return;
-    window.setTimeout(run, 5000);
+    window.setTimeout(run, 1000);
   };
-  window.setTimeout(run, 4000);
+  run();
 }
 
 function paintMe(session) {
@@ -3591,13 +3662,14 @@ async function sendFile(file) {
   }
   els.listError.textContent = "";
   if (started.id) revealFile(started.id);
-  deliverFile(started.id, file, preview.data).then(() => {
-    els.listError.textContent = "";
-  }).catch(() => {
-    if (cloudOk && isPhoto) els.listError.textContent = "";
-    else if (isPhoto) els.listError.textContent = "Foto inviata. L’amico la vede appena riapre SolaxRD.";
-    else els.listError.textContent = "File inviato. L’amico lo riceve quando riapre SolaxRD.";
+  nudgeActive({
+    file: started.id,
+    filename: file.name,
+    mime: file.type || "",
+    n: started.n,
+    text: "",
   });
+  deliverFile(started.id, file, preview.data).catch(() => {});
 }
 
 async function deliverFile(id, file, preview) {
