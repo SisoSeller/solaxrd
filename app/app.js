@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.17";
+const RELEASE_NAME = "1.0.18";
 const bootAt = Date.now();
 
 const els = {
@@ -3100,6 +3100,7 @@ function showUpdateChip(show) {
 }
 
 async function checkUpdate() {
+  // L'aggiornamento non parte mai da solo: si vede solo l'avviso, e si installa se premi Installa.
   const data = await api("/api/update");
   const local = Number(data.local);
   const shown = Number.isFinite(local) ? local : 0;
@@ -3113,7 +3114,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.17.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.18.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
@@ -3422,7 +3423,9 @@ if ($("set-custom")) {
 if ($("install-update")) $("install-update").addEventListener("click", installUpdate);
 if ($("update-chip")) $("update-chip").addEventListener("click", (event) => {
   event.stopPropagation();
-  installUpdate();
+  state.updateSnooze = false;
+  if (els.update) els.update.hidden = false;
+  showUpdateChip(false);
 });
 if ($("update-later")) $("update-later").addEventListener("click", () => {
   state.updateSnooze = true;
@@ -3476,21 +3479,24 @@ async function loadAvatar() {
 
 async function saveAvatar(file) {
   const image = await createImageBitmap(file);
-  const size = 96;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  const scale = Math.max(size / image.width, size / image.height);
-  const width = image.width * scale;
-  const height = image.height * scale;
-  ctx.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
   let blob = null;
-  for (const quality of [0.72, 0.58, 0.42, 0.28]) {
-    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= 12000) break;
+  let side = 96;
+  while (side >= 48 && (!blob || blob.size > 1500)) {
+    const canvas = document.createElement("canvas");
+    canvas.width = side;
+    canvas.height = side;
+    const ctx = canvas.getContext("2d");
+    const scale = Math.max(side / image.width, side / image.height);
+    const width = image.width * scale;
+    const height = image.height * scale;
+    ctx.drawImage(image, (side - width) / 2, (side - height) / 2, width, height);
+    for (const quality of [0.62, 0.45, 0.3, 0.18]) {
+      blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (blob && blob.size <= 1500) break;
+    }
+    side -= 16;
   }
-  if (!blob || blob.size > 28000) { els.listError.textContent = "Foto non salvata."; return; }
+  if (!blob || blob.size > 1500) { els.listError.textContent = "Foto non salvata."; return; }
   const res = await fetch("/api/avatar", { method: "POST", body: blob });
   const data = await res.json();
   if (!data.ok) { els.listError.textContent = data.error || "Foto non salvata."; return; }
