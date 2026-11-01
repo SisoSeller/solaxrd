@@ -1327,6 +1327,34 @@
     try { return JSON.parse(dec.decode(bytes)); } catch (e) { return {}; }
   }
 
+  function beatGroupCall(gid, on) {
+    const me = session();
+    if (!me || !/^[0-9a-f]{16}$/.test(String(gid || ""))) return { ok: false, names: [] };
+    const now = Math.floor(Date.now() / 1000);
+    const people = {};
+    let raw = "";
+    try {
+      const token = kvGet("k" + gid);
+      if (token) raw = dec.decode(urlB64Decode(token));
+    } catch (e) { raw = ""; }
+    String(raw || "").split("\n").forEach((line) => {
+      const cut = line.indexOf("\t");
+      if (cut < 1) return;
+      const name = line.slice(0, cut);
+      const stamp = Number(line.slice(cut + 1));
+      if (!stamp || now - stamp < 0 || now - stamp > 22) return;
+      const parsed = parseName(name);
+      if (!parsed[0]) return;
+      people[normalize(parsed[0])] = [parsed[0], stamp];
+    });
+    if (on) people[normalize(me.name)] = [me.name, now];
+    else delete people[normalize(me.name)];
+    const body = Object.values(people).map((row) => row[0] + "\t" + row[1]).join("\n");
+    try { kvSet("k" + gid, body ? urlB64(enc.encode(body)) : "0"); } catch (e) { /* skip */ }
+    const names = Object.values(people).map((row) => row[0]).filter((name) => normalize(name) !== normalize(me.name));
+    return { ok: true, names };
+  }
+
   const nativeFetch = window.fetch.bind(window);
   const PREVIEW_PART = 100;
   const PREVIEW_PARTS = 24;
@@ -1533,6 +1561,7 @@
         saveDb("chats", { items: [], inbox: 0 });
         payload = { ok: true, chats: [] };
       } else if (path === "/api/groups/create") payload = createGroup(data.name, data.members);
+      else if (path === "/api/groups/call") payload = beatGroupCall(data.id, !!data.on);
       else if (path === "/api/groups/open") payload = openGroup(data.id);
       else if (path === "/api/groups/send") payload = sendGroup(data.id, data.text);
       else if (path === "/api/groups/sync") payload = data.id ? (function () {

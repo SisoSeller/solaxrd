@@ -35,6 +35,11 @@
         <button type="button" data-theme="blue" title="Blu">Blu</button>
         <button type="button" data-theme="green" title="Verde">Verde</button>
         <button type="button" data-theme="rose" title="Rosa">Rosa</button>
+        <button type="button" data-theme="aurora" title="Aurora">Aurora</button>
+        <button type="button" data-theme="neon" title="Neon">Neon</button>
+        <button type="button" data-theme="ember" title="Brace">Brace</button>
+        <button type="button" data-theme="ocean" title="Oceano">Oceano</button>
+        <button type="button" data-theme="glass" title="Vetro">Vetro</button>
       </div>
       <h1>Entra</h1>
       <p class="lead">Nome e password. Ogni nome è unico. La password resta segreta.</p>
@@ -106,6 +111,10 @@
           <button type="button" class="ghost icon" id="people-toggle" hidden aria-label="Persone del gruppo">⌄</button>
           <button class="primary" id="call" type="button">Chiama</button>
         </header>
+        <div id="group-join" class="group-join" hidden>
+          <span id="group-join-text"></span>
+          <button type="button" class="primary" id="group-join-btn">Unisciti</button>
+        </div>
         <div id="messages" class="messages"></div>
         <div id="reply-bar" class="reply-bar" hidden></div>
         <form id="composer" class="composer">
@@ -158,10 +167,7 @@
           <small id="dock-status">Online</small>
         </span>
       </div>
-      <div class="dock-actions">
-        <button type="button" id="dock-mute" aria-pressed="false">Microfono</button>
-        <button type="button" id="dock-deaf" aria-pressed="false">Audio</button>
-      </div>
+      <div class="dock-actions" hidden></div>
     </footer>
     <section id="settings" class="settings" hidden>
       <nav class="set-nav" aria-label="Impostazioni">
@@ -227,6 +233,11 @@
             <button type="button" class="swatch" data-theme="blue">Blu</button>
             <button type="button" class="swatch" data-theme="green">Verde</button>
             <button type="button" class="swatch" data-theme="rose">Rosa</button>
+            <button type="button" class="swatch" data-theme="aurora">Aurora</button>
+            <button type="button" class="swatch" data-theme="neon">Neon</button>
+            <button type="button" class="swatch" data-theme="ember">Brace</button>
+            <button type="button" class="swatch" data-theme="ocean">Oceano</button>
+            <button type="button" class="swatch" data-theme="glass">Vetro</button>
           </div>
           <label class="field" hidden>Tema
             <select id="set-theme">
@@ -236,6 +247,11 @@
               <option value="blue">Blu</option>
               <option value="green">Verde</option>
               <option value="rose">Rosa</option>
+              <option value="aurora">Aurora</option>
+              <option value="neon">Neon</option>
+              <option value="ember">Brace</option>
+              <option value="ocean">Oceano</option>
+              <option value="glass">Vetro</option>
             </select>
           </label>
           <label class="field">Grandezza testo
@@ -243,14 +259,6 @@
               <option value="13">Piccolo</option>
               <option value="15">Normale</option>
               <option value="18">Grande</option>
-            </select>
-          </label>
-          <label class="field">Zoom finestra
-            <select id="set-zoom">
-              <option value="90">90%</option>
-              <option value="100">100%</option>
-              <option value="110">110%</option>
-              <option value="120">120%</option>
             </select>
           </label>
           <button type="button" class="switch" id="set-compact">Elenco compatto</button>
@@ -272,13 +280,6 @@
           <button type="button" class="switch" id="set-echo">Togli l’eco</button>
           <button type="button" class="switch" id="set-noise">Riduci il rumore</button>
           <button type="button" class="switch" id="set-gain">Livella il volume</button>
-          <button type="button" class="switch" id="set-ptt">Premi per parlare (spazio)</button>
-          <label class="field">FPS schermo
-            <input id="set-screen-fps" type="number" min="30" max="160" step="1">
-          </label>
-          <label class="field">Risoluzione schermo
-            <input id="set-screen-res" type="number" min="360" max="1440" step="1">
-          </label>
           <button type="button" class="switch" id="set-preview">Mostra la tua camera</button>
           <button type="button" class="switch" id="set-confirm">Chiedi prima di chiamare</button>
           <button type="button" class="switch" id="set-call-sound">Suono chiamata</button>
@@ -303,7 +304,7 @@
           <h2>Sistema</h2>
           <button type="button" class="switch" id="set-top">Sempre in primo piano</button>
           <button type="button" class="switch" id="set-startup">Apri all’avvio di Windows</button>
-          <p id="version-label" class="lead">1.0.18</p>
+          <p id="version-label" class="lead">1.0.19</p>
           <div class="actions">
             <button type="button" class="primary" id="check-update">Controlla aggiornamento</button>
             <button type="button" class="ghost" id="clear-chats">Svuota elenco chat</button>

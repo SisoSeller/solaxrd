@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.18";
+const RELEASE_NAME = "1.0.19";
 const bootAt = Date.now();
 
 const els = {
@@ -179,7 +179,7 @@ function isBlocked(name) {
   return (state.settings.blocked || []).some((item) => item.toLocaleLowerCase("it") === key);
 }
 
-const THEMES = ["dark", "light", "purple", "blue", "green", "rose"];
+const THEMES = ["dark", "light", "purple", "blue", "green", "rose", "aurora", "neon", "ember", "ocean", "glass"];
 
 function blankSettings() {
   return {
@@ -246,7 +246,7 @@ function applyLocal() {
   const settings = state.settings && typeof state.settings === "object" ? state.settings : blankSettings();
   state.settings = settings;
   document.body.style.fontSize = `${settings.fontSize || 15}px`;
-  document.body.style.zoom = `${settings.zoom || 100}%`;
+  document.body.style.zoom = "100%";
   document.body.classList.toggle("compact", !!settings.compact);
   document.body.classList.toggle("reduce", settings.reduceMotion !== false);
   applyOutputVolume();
@@ -1413,10 +1413,10 @@ function updateToggles() {
     deafBtn.textContent = state.deaf ? "Riattiva audio" : "Muta audio";
   }
   if (els.mute) {
-    els.mute.textContent = state.settings.pushToTalk
-      ? (state.ptt ? "Parli" : "Tieni spazio")
-      : (state.micOn ? "Muto" : "Riattiva");
+    els.mute.textContent = state.micOn ? "Muto" : "Riattiva";
+    els.mute.classList.toggle("is-on", live && !state.micOn);
   }
+  if (deafBtn) deafBtn.classList.toggle("is-on", live && !!state.deaf);
   if (els.camera) els.camera.textContent = state.camOn ? "Chiudi camera" : "Camera";
   if (els.hangup) els.hangup.textContent = "Esci";
 }
@@ -1458,6 +1458,8 @@ function endCall(message, notify) {
     if (message) setStatus(message);
     return;
   }
+  const leavingGroup = state.groupCall && state.groupCall.id;
+  if (leavingGroup) api("/api/groups/call", { id: leavingGroup, on: false }).catch(() => {});
   const call = state.voice;
   const pending = state.pendingCall;
   const link = state.link || state.incoming;
@@ -1718,15 +1720,8 @@ async function toggleCamera() {
   if (state.phase !== "live") return;
   if (state.camOn) { await stopExtra(true); return; }
   try {
-    const video = {
-      width: { ideal: 3840 },
-      height: { ideal: 2160 },
-      frameRate: { ideal: 60, max: 60 },
-    };
-    if (state.settings.camId) video.deviceId = { ideal: state.settings.camId };
+    const video = state.settings.camId ? { deviceId: { ideal: state.settings.camId } } : true;
     const stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
-    const track = stream.getVideoTracks()[0];
-    if (track) await applyTrackQuality(track, "camera");
     await publishVideo(stream, "camera");
   } catch (e) {
     setStatus("Camera non disponibile.");
@@ -1909,7 +1904,7 @@ function onSignal(msg) {
   if (msg.t === "reject" && state.phase === "out" && !state.groupCall) endCall("Ha rifiutato.", false);
   if (msg.t === "busy" && state.phase === "out" && !state.voice && !state.groupCall) endCall("È già in chiamata.", false);
   if (msg.t === "hangup" && !state.groupCall) {
-    if (state.phase === "out") return;
+    if (state.phase === "out" || state.groupInvite) return;
     state.remoteBye = true;
     // Hangup spurii di PeerJS arrivano spesso a ~1–2s: non chiudere subito.
     if (shouldIgnoreHangup()) {
@@ -2627,12 +2622,58 @@ async function meshGroup() {
   await Promise.all(others.map((name) => ringGroupMember(name).catch(() => {})));
 }
 
+function paintGroupJoin(names) {
+  const bar = $("group-join");
+  const text = $("group-join-text");
+  if (!bar) return;
+  const list = (names || []).filter(Boolean);
+  const show = state.phase === "idle" && state.activeKind === "group" && state.group && list.length;
+  bar.hidden = !show;
+  if (!show || !text) return;
+  text.textContent = list.length === 1
+    ? `${list[0]} è in chiamata`
+    : `${list.join(" e ")} sono in chiamata`;
+}
+
+async function watchGroupCall() {
+  if (state.groupCall && state.groupCall.id && (state.phase === "live" || state.phase === "out")) {
+    const data = await api("/api/groups/call", { id: state.groupCall.id, on: true });
+    if (data && data.ok) paintGroupJoin([]);
+    return;
+  }
+  if (state.phase !== "idle" || state.activeKind !== "group" || !state.group) {
+    paintGroupJoin([]);
+    return;
+  }
+  const data = await api("/api/groups/call", { id: state.group.id, on: false });
+  paintGroupJoin((data && data.names) || []);
+}
+
+async function joinOngoingCall() {
+  if (state.phase !== "idle" || !state.group) return;
+  unlockAudio();
+  const stream = await ensureMic().catch(() => null);
+  if (!micLive(stream)) {
+    els.listError.textContent = "Microfono non disponibile.";
+    return;
+  }
+  state.phase = "live";
+  joinGroupRoom(state.group, "");
+  openCallStage();
+  stopRing();
+  showLiveUI();
+  paintGroupJoin([]);
+  meshGroup().catch(() => {});
+  watchGroupCall().catch(() => {});
+}
+
 function beginIncomingGroup(link, msg) {
   if (!msg || !msg.gid) return;
   if (state.groupCall && state.groupCall.id === msg.gid) {
     rememberGroupPeer(link && link.peer, { link, name: msg.name || "" });
     return;
   }
+  if (state.groupInvite && state.groupInvite.gid === msg.gid) return;
   if (linkIsNoise(link)) return;
   if (state.phase !== "idle") {
     try { link && link.send({ t: "busy" }); } catch (e) { /* ignore */ }
@@ -3114,7 +3155,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.18.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.19.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
@@ -3212,6 +3253,7 @@ async function loop() {
     ticks += 1;
     try {
       await syncNow();
+      await watchGroupCall().catch(() => {});
       if (ticks % 4 === 0) await api("/api/heartbeat", {});
       if (ticks % 3 === 0) await pullPresence();
       if (ticks % 2 === 0) await pullOnline();
@@ -3438,12 +3480,12 @@ $("file-input").addEventListener("change", () => {
   $("file-input").value = "";
   if (file) sendFile(file);
 });
-$("dock-mute").addEventListener("click", () => {
+if ($("dock-mute")) $("dock-mute").addEventListener("click", () => {
   state.micMuted = !state.micMuted;
   state.micOn = !state.micMuted;
   applyPresence(false);
 });
-$("dock-deaf").addEventListener("click", () => {
+if ($("dock-deaf")) $("dock-deaf").addEventListener("click", () => {
   state.deaf = !state.deaf;
   if (state.deaf) state.micMuted = true;
   state.micOn = !state.micMuted;
@@ -3525,6 +3567,27 @@ async function saveFriendAvatar(name, b64) {
   bumpAvatars();
 }
 
+async function shrinkAvatarBlob(blob) {
+  if (!blob || blob.size <= 1500) return blob;
+  const image = await createImageBitmap(blob);
+  let next = blob;
+  let side = 96;
+  while (side >= 48 && (!next || next.size > 1500)) {
+    const canvas = document.createElement("canvas");
+    canvas.width = side;
+    canvas.height = side;
+    const ctx = canvas.getContext("2d");
+    const scale = Math.max(side / image.width, side / image.height);
+    ctx.drawImage(image, (side - image.width * scale) / 2, (side - image.height * scale) / 2, image.width * scale, image.height * scale);
+    for (const quality of [0.62, 0.4, 0.24]) {
+      next = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (next && next.size <= 1500) return next;
+    }
+    side -= 16;
+  }
+  return next && next.size <= 1500 ? next : blob;
+}
+
 async function publishMyAvatar() {
   if (state.avatarPublished || !state.me) return;
   const mine = await fetch("/api/avatar");
@@ -3532,7 +3595,7 @@ async function publishMyAvatar() {
     state.avatarPublished = true;
     return;
   }
-  const blob = await mine.blob();
+  const blob = await shrinkAvatarBlob(await mine.blob());
   const res = await fetch("/api/avatar/publish", { method: "POST", body: blob });
   const data = await res.json().catch(() => ({}));
   if (data && data.ok) state.avatarPublished = true;
@@ -3565,10 +3628,16 @@ async function shareAvatars() {
 }
 
 async function applyPresence(fromServer) {
-  $("dock-mute").setAttribute("aria-pressed", state.micMuted ? "true" : "false");
-  $("dock-deaf").setAttribute("aria-pressed", state.deaf ? "true" : "false");
-  $("dock-mute").textContent = state.micMuted ? "Mutato" : "Microfono";
-  $("dock-deaf").textContent = state.deaf ? "Silenziato" : "Audio";
+  const dockMute = $("dock-mute");
+  const dockDeaf = $("dock-deaf");
+  if (dockMute) {
+    dockMute.setAttribute("aria-pressed", state.micMuted ? "true" : "false");
+    dockMute.textContent = state.micMuted ? "Mutato" : "Microfono";
+  }
+  if (dockDeaf) {
+    dockDeaf.setAttribute("aria-pressed", state.deaf ? "true" : "false");
+    dockDeaf.textContent = state.deaf ? "Silenziato" : "Audio";
+  }
   els.remoteAudio.volume = liveVolume();
   if (state.localAudio) state.localAudio.getAudioTracks().forEach((track) => { track.enabled = state.micOn && !state.deaf; });
   if (state.sentAudio) state.sentAudio.getAudioTracks().forEach((track) => { track.enabled = state.micOn && !state.deaf; });
@@ -3901,6 +3970,10 @@ function pressCall(event) {
 }
 els.call.addEventListener("pointerdown", pressCall);
 els.call.addEventListener("click", pressCall);
+if ($("group-join-btn")) $("group-join-btn").addEventListener("click", () => {
+  if (state.groupInvite) acceptCall();
+  else joinOngoingCall();
+});
 function desktop(name) {
   try {
     const api = window.pywebview && window.pywebview.api;
