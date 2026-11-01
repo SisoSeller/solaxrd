@@ -1293,16 +1293,26 @@
     return kvSet(publicAvatarKey(name), "c" + count);
   }
 
+  function jpegOk(bytes) {
+    return !!(bytes && bytes.length >= 32 && bytes.length <= 300000
+      && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF
+      && bytes[bytes.length - 2] === 0xFF && bytes[bytes.length - 1] === 0xD9);
+  }
+
   async function readPublicAvatar(name) {
     const raw = await kvGet(publicAvatarKey(name)) || "";
     if (!raw || raw === AVATAR_REMOVED || raw.charAt(0) !== "c") return { raw, jpeg: "" };
     const count = Number(raw.slice(1)) || 0;
     if (count < 1 || count > AVATAR_PARTS) return { raw, jpeg: "" };
-    let token = "";
-    for (let i = 0; i < count; i += 1) token += await kvGet(avatarPartKey(name, i)) || "";
+    const parts = [];
+    for (let i = 0; i < count; i += 1) {
+      const piece = await kvGet(avatarPartKey(name, i)) || "";
+      if (!piece || piece === "0" || (i < count - 1 && piece.length !== AVATAR_PART)) return { raw, jpeg: "" };
+      parts.push(piece);
+    }
     try {
-      const bytes = urlB64Decode(token);
-      if (bytes.length >= 32 && bytes[0] === 0xFF && bytes[1] === 0xD8) return { raw, jpeg: b64FromBytes(bytes) };
+      const bytes = urlB64Decode(parts.join(""));
+      if (jpegOk(bytes)) return { raw, jpeg: b64FromBytes(bytes) };
     } catch (e) { /* skip */ }
     return { raw, jpeg: "" };
   }
@@ -1461,7 +1471,13 @@
           if (mine) return binResponse(bytesFromB64(mine), "image/jpeg", 200);
         }
         const b64 = N.readFile("a-" + normalize(display));
-        if (b64) return binResponse(bytesFromB64(b64), "image/jpeg", 200);
+        let bytes = b64 ? bytesFromB64(b64) : null;
+        if (!jpegOk(bytes)) {
+          const packed = await readPublicAvatar(display);
+          bytes = packed.jpeg ? bytesFromB64(packed.jpeg) : null;
+          if (jpegOk(bytes)) N.writeFile("a-" + normalize(display), packed.jpeg);
+        }
+        if (jpegOk(bytes)) return binResponse(bytes, "image/jpeg", 200);
         return binResponse(new Uint8Array(), "text/plain", 404);
       }
       if (path === "/api/files/upload") {

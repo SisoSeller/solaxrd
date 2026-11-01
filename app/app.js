@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.20";
+const RELEASE_NAME = "1.0.21";
 const bootAt = Date.now();
 
 const els = {
@@ -2334,38 +2334,35 @@ function avatarSrc(name) {
   return `/api/avatar/friend?name=${encodeURIComponent(name)}&t=${tick}`;
 }
 
-const avatarUrls = new Map();
-
 function bindAvatar(img, letter, name) {
   if (!img || !name) return;
   const ticket = String(state.avatarTick || 1);
+  const samePhoto = img.dataset.avatar === name && img.dataset.ready === "1";
   img.dataset.avatar = name;
   img.alt = "";
-  img.hidden = true;
-  if (letter) letter.hidden = false;
-  const key = name.toLocaleLowerCase("it") + ":" + ticket;
-  const show = (url) => {
-    if (img.dataset.avatar !== name || String(state.avatarTick || 1) !== ticket) return;
-    img.onload = () => { img.hidden = false; if (letter) letter.hidden = true; };
-    img.onerror = () => { img.hidden = true; if (letter) letter.hidden = false; };
-    img.src = url;
+  const current = () => img.dataset.avatar === name && String(state.avatarTick || 1) === ticket;
+  const reveal = () => {
+    if (!current()) return;
+    img.hidden = false;
+    img.style.visibility = "";
+    img.dataset.ready = "1";
+    if (letter) letter.hidden = true;
   };
-  const cached = avatarUrls.get(key);
-  if (cached) { show(cached); return; }
-  fetch(avatarSrc(name)).then((res) => {
-    if (!res.ok) throw new Error("missing");
-    return res.blob();
-  }).then((blob) => {
-    if (!blob || !blob.size) throw new Error("empty");
-    const url = URL.createObjectURL(blob);
-    avatarUrls.set(key, url);
-    show(url);
-  }).catch(() => {
-    if (img.dataset.avatar === name) {
-      img.hidden = true;
-      if (letter) letter.hidden = false;
-    }
-  });
+  const hide = () => {
+    if (!current()) return;
+    img.hidden = true;
+    img.style.visibility = "";
+    img.dataset.ready = "";
+    if (letter) letter.hidden = false;
+  };
+  img.onload = () => reveal();
+  img.onerror = () => hide();
+  const url = avatarSrc(name);
+  if (!samePhoto && letter) letter.hidden = false;
+  img.hidden = false;
+  img.style.visibility = samePhoto ? "" : "hidden";
+  if (img.getAttribute("src") !== url) img.src = url;
+  if (img.complete && img.naturalWidth > 0) reveal();
 }
 
 function bumpAvatars() {
@@ -3157,7 +3154,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.20.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.21.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
