@@ -48,6 +48,7 @@ body.android .settings, html.phone .settings {
   inset: 0;
   z-index: 80;
   overflow: hidden;
+  padding-bottom: 0;
   background: var(--bg);
 }
 body.android .set-nav, html.phone .set-nav {

@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const RELEASE_NAME = "1.0.19";
+const RELEASE_NAME = "1.0.20";
 const bootAt = Date.now();
 
 const els = {
@@ -446,6 +446,8 @@ function setView(view) {
   els.settings.hidden = view !== "settings";
   $("nav-chats").classList.toggle("active", view !== "settings");
   $("nav-settings").classList.toggle("active", view === "settings");
+  const shell = $("shell");
+  if (shell) shell.classList.toggle("settings-open", view === "settings");
   const peopleToggle = $("people-toggle");
   if (view === "thread" && state.activeKind === "group") {
     if (phoneLayout()) {
@@ -3155,7 +3157,7 @@ async function checkUpdate() {
   if ($("update-copy") && !state.updating && pending) {
     $("update-copy").textContent = document.body.classList.contains("android")
       ? "C’è una versione nuova. Riscarica l’APK dal sito."
-      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.19.";
+      : "Premi Installa ora: SolaxRD si chiude e si riapre con la versione 1.0.20.";
   }
   if (document.body.classList.contains("android")) {
     if ($("install-update") && !state.updating) $("install-update").textContent = "Apri il sito";
